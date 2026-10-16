@@ -1,0 +1,8 @@
+{
+  "name": "Jhapto",
+  "description": "Hostel Quick Commerce platform for college students with floor-priority listings, instant ordering, real-time order chat, and admin analytics dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
