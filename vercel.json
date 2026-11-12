@@ -1,0 +1,19 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npm ci --include=dev",
+  "buildCommand": "npm run build",
+  "outputDirectory": "jhapto-frontend/dist",
+  "regions": ["sin1"],
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 15,
+      "includeFiles": "jhapto-backend/**"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/uploads/(.*)", "destination": "/api" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

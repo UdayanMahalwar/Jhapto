@@ -1,7 +1,22 @@
 import { io } from 'socket.io-client';
 
 // One shared Socket.IO connection per logged-in student (same origin as the page).
+// On serverless hosting (Vercel) there is no WebSocket server: the build sets
+// VITE_REALTIME=false and pages fall back to polling.
+export const REALTIME_ENABLED = import.meta.env.VITE_REALTIME !== 'false';
+
 let socket = null;
+
+// Stand-in used when realtime is off: same methods, never connects
+const offlineSocket = {
+  connected: false,
+  on() { return this; },
+  off() { return this; },
+  emit() { return this; },
+  connect() { return this; },
+  disconnect() { return this; },
+  removeAllListeners() { return this; },
+};
 
 const handleAuthFailure = (message) => {
   localStorage.removeItem('token');
@@ -13,6 +28,7 @@ const handleAuthFailure = (message) => {
 };
 
 export const getSocket = () => {
+  if (!REALTIME_ENABLED) return offlineSocket;
   if (socket) return socket;
   socket = io({
     // read the token on every (re)connect so a new login is picked up

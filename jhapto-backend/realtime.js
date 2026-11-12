@@ -23,7 +23,7 @@ let io = null;
 // Same query routes/reports.js uses to find an order's two parties
 const ORDER_PARTIES_SQL =
   `SELECT o.buyer_id, l.seller_id
-   FROM \`Order\` o
+   FROM "Order" o
    JOIN Order_Item oi ON o.order_id    = oi.order_id
    JOIN Listing    l  ON oi.listing_id = l.listing_id
    WHERE o.order_id = ? LIMIT 1`;

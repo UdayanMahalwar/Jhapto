@@ -44,7 +44,7 @@ router.post('/register', adminAuth, async (req, res) => {
   name = name.trim();
   email = email.trim().toLowerCase();
   try {
-    const [existing] = await db.query('SELECT admin_id FROM Admin WHERE email = ?', [email]);
+    const [existing] = await db.query('SELECT admin_id FROM Admin WHERE lower(email) = lower(?)', [email]);
     if (existing.length > 0) {
       return res.status(409).json({ message: 'Admin email already registered.' });
     }
@@ -79,7 +79,7 @@ router.post('/login', loginLimiter, async (req, res) => {
   }
   try {
     const [rows] = await db.query(
-      'SELECT * FROM Admin WHERE email = ?', [email.trim()]
+      'SELECT * FROM Admin WHERE lower(email) = lower(?)', [email.trim()]
     );
     const admin = rows[0];
     const isMatch = admin ? await bcrypt.compare(password, admin.password_hash) : false;
@@ -157,8 +157,8 @@ router.patch('/students/:id/unban', adminAuth, async (req, res) => {
 // Full admin report using stored procedure with cursor
 router.get('/report', adminAuth, async (req, res) => {
   try {
-    const [rows] = await db.query('CALL sp_admin_report()');
-    res.json(rows[0]);
+    const [rows] = await db.query('SELECT * FROM sp_admin_report()');
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ message: 'Error generating report.', error: err.message });
   }

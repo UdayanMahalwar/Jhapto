@@ -47,7 +47,7 @@ router.post('/register', registerLimiter, async (req, res) => {
 
     // Check if email already exists
     const [existingEmail] = await db.query(
-      'SELECT student_id FROM Student WHERE email = ?', [email]
+      'SELECT student_id FROM Student WHERE lower(email) = lower(?)', [email]
     );
     if (existingEmail.length > 0) {
       return res.status(409).json({ message: 'Email already registered.' });
@@ -92,7 +92,7 @@ router.post('/login', loginLimiter, async (req, res) => {
        FROM Student s
        JOIN Floor  f ON s.floor_id  = f.floor_id
        JOIN Hostel h ON s.hostel_id = h.hostel_id
-       WHERE s.email = ?`,
+       WHERE lower(s.email) = lower(?)`,
       [email.trim()]
     );
 

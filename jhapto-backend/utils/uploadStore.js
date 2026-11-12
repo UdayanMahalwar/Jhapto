@@ -16,7 +16,7 @@ const db = () => require('../config/db');
 async function save(name, buffer, ext, uploadedBy = null) {
   if (usesDatabase()) {
     await db().query(
-      'INSERT INTO Upload (name, mime_type, data, uploaded_by) VALUES (?, ?, ?, ?)',
+      'INSERT INTO Upload (name, mime_type, data, uploaded_by) VALUES (?, ?, ?, ?) RETURNING name',
       [name, MIME[ext], buffer, uploadedBy]
     );
     return;
