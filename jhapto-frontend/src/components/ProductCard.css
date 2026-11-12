@@ -1,40 +1,180 @@
 .product-card {
   display: flex;
   flex-direction: column;
-  padding: 1rem;
+  padding: 0.75rem;
   transition: var(--transition);
   position: relative;
   overflow: hidden;
 }
 
 .product-card:hover {
-  transform: translateY(-5px);
+  transform: translateY(-4px);
   box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
   border-color: rgba(69, 243, 255, 0.3);
 }
 
-.product-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
+.product-image-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: linear-gradient(135deg, rgba(69, 243, 255, 0.06), rgba(247, 37, 133, 0.06));
+  border-radius: 12px;
+  margin-bottom: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.product-image-container img {
   width: 100%;
   height: 100%;
-  background: radial-gradient(circle at top right, rgba(247, 37, 133, 0.1), transparent 50%);
-  opacity: 0;
+  object-fit: cover;
+}
+
+.product-image-placeholder {
+  font-size: 3rem;
+  opacity: 0.85;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.4));
+}
+
+.product-floor {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(11, 12, 16, 0.75);
+  color: var(--text-secondary);
+  backdrop-filter: blur(6px);
+}
+
+.product-floor.same {
+  background: rgba(69, 243, 255, 0.9);
+  color: #001014;
+}
+
+.product-stock {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 0.5rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(245, 185, 66, 0.9);
+  color: #1d1300;
+}
+
+.product-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 0 0.25rem 0.25rem;
+}
+
+.product-name {
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin-bottom: 0.2rem;
+}
+
+.product-seller {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.product-rating {
+  margin-top: 0.3rem;
+}
+
+.product-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.85rem;
+}
+
+.product-price {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--primary-color);
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  column-gap: 0.4rem;
+}
+
+.price-symbol {
+  font-size: 0.85em;
+  font-weight: 700;
+  margin-right: -0.3rem;   /* sits tight against the number despite the column gap */
+}
+
+.product-mrp {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: line-through;
+}
+
+.add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(69, 243, 255, 0.1);
+  color: var(--primary-color);
+  border: 1px solid rgba(69, 243, 255, 0.35);
+  height: 36px;
+  padding: 0 0.8rem;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
   transition: var(--transition);
-  z-index: 0;
 }
 
-.product-card:hover::before {
-  opacity: 1;
+.add-btn:hover {
+  background: var(--primary-color);
+  color: var(--bg-color);
+  box-shadow: 0 0 15px rgba(69, 243, 255, 0.4);
 }
 
-.product-priority {
-  margin-bottom: 1rem;
-  z-index: 1;
+.cart-stepper {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--primary-color);
+  color: #001014;
+  font-weight: 800;
 }
 
+.cart-stepper button {
+  width: 34px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cart-stepper span {
+  min-width: 18px;
+  text-align: center;
+}
+
+/* Kept for other pages that still use these badge classes */
 .badge {
   font-size: 0.7rem;
   font-weight: 700;
@@ -54,79 +194,32 @@
   color: var(--text-secondary);
 }
 
-.product-image-container {
-  width: 100%;
-  height: 160px;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 12px;
-  margin-bottom: 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1;
-}
+@media (max-width: 480px) {
+  .product-card {
+    padding: 0.55rem;
+  }
 
-.product-image-placeholder {
-  font-size: 4rem;
-  color: var(--surface-color);
-  font-weight: 800;
-  text-shadow: 2px 2px 0px rgba(255,255,255,0.1);
-}
+  .product-name {
+    font-size: 0.92rem;
+  }
 
-.product-info {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  z-index: 1;
-}
+  .product-price {
+    font-size: 1.05rem;
+  }
 
-.product-name {
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin-bottom: 0.25rem;
-}
+  .add-btn span {
+    display: none;
+  }
 
-.product-seller {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  margin-bottom: 1rem;
-}
+  .add-btn {
+    padding: 0 0.6rem;
+  }
 
-.product-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: auto;
-}
+  .product-footer {
+    padding-top: 0.6rem;
+  }
 
-.product-price {
-  font-size: 1.4rem;
-  font-weight: 800;
-  color: var(--primary-color);
-}
-
-.price-symbol {
-  font-size: 0.9rem;
-  margin-right: 2px;
-}
-
-.add-btn {
-  background: var(--surface-color);
-  color: var(--primary-color);
-  border: 1px solid var(--border-color);
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: var(--transition);
-}
-
-.add-btn:hover {
-  background: var(--primary-color);
-  color: var(--bg-color);
-  transform: scale(1.1);
-  box-shadow: 0 0 15px rgba(69, 243, 255, 0.4);
+  .cart-stepper button {
+    width: 28px;
+  }
 }

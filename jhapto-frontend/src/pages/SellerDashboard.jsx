@@ -1,32 +1,47 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Check, MessageCircle, PackageCheck, Flag, Store, Inbox, Pencil, Trash2, RotateCcw } from 'lucide-react';
 import Header from '../components/Header';
 import { AuthContext } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import api from '../utils/api';
 import { uploadImage } from '../utils/upload';
 import OrderFilters from '../components/OrderFilters';
-import StarRating from '../components/StarRating';
+import OrderCard from '../components/OrderCard';
+import Tabs from '../components/Tabs';
+import EmptyState from '../components/EmptyState';
+import FilePicker from '../components/FilePicker';
+import StatusBadge from '../components/StatusBadge';
+import ReportDialog from '../components/ReportDialog';
 import { STATUSES_FOR_TAB, EMPTY_FILTERS, orderFilterParams } from '../utils/orderFilters';
 
-const fieldStyle = { padding: '0.8rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' };
+const EMPTY_LISTING = { mrp: '', selling_price: '', quantity_available: '', description: '', photo_url: '' };
+
+// "Max ₹21.00" helper under the price field (selling price may not exceed 1.5 × MRP)
+const maxPrice = (mrp) => {
+  const n = Number(mrp);
+  return n > 0 ? `Max ₹${(Math.floor(n * 150) / 100).toFixed(2)} (1.5 × MRP)` : 'At most 1.5 × MRP';
+};
 
 const SellerDashboard = () => {
   const [listings, setListings] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [pendingCount, setPendingCount] = useState(0);
   const [items, setItems] = useState([]);
   // Order tab lives in the URL (?tab=history) so notifications can link to it
   const [searchParams, setSearchParams] = useSearchParams();
   const activeOrderTab = searchParams.get('tab') === 'history' ? 'history' : 'active';
   const [photoInputKey, setPhotoInputKey] = useState(0);   // bump to reset the file picker
-  const [reportModal, setReportModal] = useState({ show: false, order: null });
-  const [reportReason, setReportReason] = useState('');
-  const [reportProof, setReportProof] = useState('');
-  const [newListing, setNewListing] = useState({ item_id: '', mrp: '', selling_price: '', quantity_available: '', description: '', room_number: '' });
+  const [newListing, setNewListing] = useState({ item_id: '', room_number: '', ...EMPTY_LISTING });
+  const [creating, setCreating] = useState(false);
   const [orderFilters, setOrderFilters] = useState(EMPTY_FILTERS);
   const [editListing, setEditListing] = useState(null); // form state for the listing being edited
   const [editError, setEditError] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [reporting, setReporting] = useState(null);
+  const { user, logout } = useContext(AuthContext);
+  const navigate = useNavigate();
+  const toast = useToast();
 
   // Uploads the picked image and passes its URL to onDone; clears the picker on failure
   const pickImage = async (e, onDone, onError) => {
@@ -42,11 +57,6 @@ const SellerDashboard = () => {
       setUploading(false);
     }
   };
-  
-  const { user, logout } = useContext(AuthContext);
-  const navigate = useNavigate();
-
-  const showNotification = useToast();
 
   useEffect(() => {
     fetchData();
@@ -59,12 +69,14 @@ const SellerDashboard = () => {
 
   const fetchData = async () => {
     try {
-      const [listRes, itemsRes] = await Promise.all([
+      const [listRes, itemsRes, pendingRes] = await Promise.all([
         api.get('/listings/my'),
-        api.get('/listings/items')
+        api.get('/listings/items'),
+        api.get('/orders/selling', { params: { status: 'Placed' } }),
       ]);
       setListings(listRes.data);
       setItems(itemsRes.data);
+      setPendingCount(pendingRes.data.length);
       if (itemsRes.data.length > 0) {
         setNewListing(prev => ({ ...prev, item_id: prev.item_id || itemsRes.data[0].item_id }));
       }
@@ -82,6 +94,12 @@ const SellerDashboard = () => {
     }
   };
 
+  // Dropdown grouped by category: { 'Beverages': [items…], … }
+  const itemsByCategory = useMemo(() => items.reduce((groups, item) => {
+    (groups[item.category_name] = groups[item.category_name] || []).push(item);
+    return groups;
+  }, {}), [items]);
+
   const switchOrderTab = (tab) => {
     setSearchParams(tab === 'history' ? { tab: 'history' } : {}, { replace: true });
     setOrderFilters(EMPTY_FILTERS);
@@ -97,22 +115,20 @@ const SellerDashboard = () => {
       quantity_available: String(l.quantity_available),
       description: l.description || '',
       room_number: l.room_number || '',
+      current_photo: l.photo_url || '',
       photo_url: undefined, // unchanged unless a new photo is picked
     });
   };
 
-  const handleEditPhoto = (e) => pickImage(e,
-    (url) => setEditListing(prev => ({ ...prev, photo_url: url })),
-    setEditError);
-
   const handleSaveEdit = async (e) => {
     e.preventDefault();
     setEditError('');
-    const { listing_id, item_name, photo_url, ...fields } = editListing;
+    // eslint-disable-next-line no-unused-vars
+    const { listing_id, item_name, current_photo, photo_url, ...fields } = editListing;
     if (photo_url !== undefined) fields.photo_url = photo_url;
     try {
       const res = await api.patch(`/listings/${listing_id}`, fields);
-      showNotification(res.data.listing_status === 'OutOfStock' ? 'Listing saved (out of stock)' : 'Listing updated');
+      toast(res.data.listing_status === 'OutOfStock' ? 'Saved — marked out of stock' : 'Listing updated');
       setEditListing(null);
       fetchData();
     } catch (err) {
@@ -122,263 +138,281 @@ const SellerDashboard = () => {
 
   const handleAddListing = async (e) => {
     e.preventDefault();
+    setCreating(true);
     try {
       await api.post('/listings', newListing);
-      showNotification('Listing created successfully!');
+      toast('Listing is live!');
       // keep the item and room — sellers usually list several things from the same room
-      setNewListing(prev => ({ ...prev, mrp: '', selling_price: '', quantity_available: '', description: '', photo_url: '' }));
-      setPhotoInputKey(k => k + 1);   // the photo was used; clear the picker so it doesn't look attached
+      setNewListing(prev => ({ ...prev, ...EMPTY_LISTING }));
+      setPhotoInputKey(k => k + 1);
       fetchData();
     } catch (err) {
-      showNotification(err.response?.data?.message || 'Error creating listing', 'error');
+      toast(err.response?.data?.message || 'Error creating listing', 'error');
+    } finally {
+      setCreating(false);
     }
   };
 
-  const handleDeleteListing = async (id) => {
-    if (!window.confirm('Remove listing?')) return;
+  const handleDeleteListing = async (listing) => {
+    if (!window.confirm(`Remove your "${listing.item_name}" listing? Buyers won't see it any more.`)) return;
     try {
-      await api.delete(`/listings/${id}`);
-      showNotification('Listing removed');
+      await api.delete(`/listings/${listing.listing_id}`);
+      toast('Listing removed');
       fetchData();
     } catch (err) {
-      showNotification('Error removing listing', 'error');
+      toast(err.response?.data?.message || 'Error removing listing', 'error');
     }
   };
 
   const handleUpdateOrder = async (order_id, action) => {
     try {
       await api.patch(`/orders/${order_id}/${action}`);
-      showNotification(`Order ${action}ed!`);
+      toast(action === 'confirm' ? 'Order confirmed — the buyer can now chat with you.' : 'Marked as delivered.');
       fetchOrders();
       fetchData();
     } catch (err) {
-      showNotification(err.response?.data?.message || `Error updating order`, 'error');
+      toast(err.response?.data?.message || 'Error updating order', 'error');
     }
   };
 
-  const handleFileChange = (e) => pickImage(e,
-    (url) => setNewListing(prev => ({ ...prev, photo_url: url })),
-    (msg) => showNotification(msg, 'error'));
-
-  const handleReportFileChange = (e) => pickImage(e, setReportProof, (msg) => showNotification(msg, 'error'));
-
-  const submitReport = async (e) => {
-    e.preventDefault();
-    if (!reportReason) return showNotification('Reason is required', 'error');
-    try {
-      await api.post('/reports', {
-        order_id: reportModal.order.order_id,
-        reported_user_id: reportModal.order.buyer_id,
-        reason: reportReason,
-        proof_url: reportProof
-      });
-      showNotification('Report submitted. Admins will review it.');
-      setReportModal({ show: false, order: null });
-      setReportReason('');
-      setReportProof('');
-    } catch (err) {
-      showNotification(err.response?.data?.message || 'Error submitting report', 'error');
-    }
-  };
+  const set = (patch) => setNewListing(prev => ({ ...prev, ...patch }));
+  const setEdit = (patch) => setEditListing(prev => ({ ...prev, ...patch }));
+  const visibleListings = listings.filter(l => l.listing_status !== 'Removed');
+  const removedCount = listings.length - visibleListings.length;
+  const filtered = orderFilters.status || orderFilters.from || orderFilters.to;
 
   return (
     <>
       <Header user={user} onLogout={logout} onOrdersClick={() => navigate('/orders')} onSellerClick={() => navigate('/seller')} />
-      
-      <div className="seller-grid">
-        
-        {/* LEFT COLUMN: Manage Listings */}
-        <div>
-          <h2 className="text-gradient" style={{ marginBottom: '1.5rem' }}>Seller Dashboard</h2>
-          
-          <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
-            <h3 style={{ marginBottom: '1rem' }}>Add New Listing</h3>
-            <form onSubmit={handleAddListing} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <select 
-                value={newListing.item_id} 
-                onChange={(e) => setNewListing({...newListing, item_id: e.target.value})}
-                style={{ padding: '0.8rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' }}
-              >
-                {items.map(item => <option key={item.item_id} value={item.item_id}>{item.item_name} ({item.brand})</option>)}
-              </select>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <input type="number" placeholder="MRP" required value={newListing.mrp} onChange={(e) => setNewListing({...newListing, mrp: e.target.value})} style={{ flex: 1, minWidth: 0, padding: '0.8rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' }} />
-                <input type="number" placeholder="Selling Price" required value={newListing.selling_price} onChange={(e) => setNewListing({...newListing, selling_price: e.target.value})} style={{ flex: 1, minWidth: 0, padding: '0.8rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' }} />
-              </div>
-              <input type="number" placeholder="Quantity Available" required value={newListing.quantity_available} onChange={(e) => setNewListing({...newListing, quantity_available: e.target.value})} style={{ padding: '0.8rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' }} />
-              <input type="text" placeholder="Room Number (e.g., K-204)" required value={newListing.room_number} onChange={(e) => setNewListing({...newListing, room_number: e.target.value})} style={{ padding: '0.8rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' }} />
-              <input type="text" placeholder="Description (Optional)" value={newListing.description} onChange={(e) => setNewListing({...newListing, description: e.target.value})} style={{ padding: '0.8rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' }} />
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Product Photo (Take a picture or upload)</label>
-                <input key={photoInputKey} type="file" accept="image/png,image/jpeg,image/gif,image/webp" capture="environment" onChange={handleFileChange} style={{ padding: '0.8rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)', maxWidth: '100%' }} />
-                {newListing.photo_url && !uploading && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <img src={newListing.photo_url} alt="Selected product" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: '8px' }} />
-                    <button type="button" onClick={() => { setNewListing(prev => ({ ...prev, photo_url: '' })); setPhotoInputKey(k => k + 1); }}
-                      style={{ background: 'transparent', border: 'none', color: 'var(--secondary-color)', cursor: 'pointer' }}>Remove photo</button>
-                  </div>
-                )}
-                {uploading && <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)' }}>Uploading…</span>}
-              </div>
 
-              <button type="submit" disabled={uploading} className="auth-btn" style={{ marginTop: 0, opacity: uploading ? 0.6 : 1 }}>Add Listing</button>
-            </form>
-          </div>
-
-          <h3>My Listings</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
-            {listings.length === 0 && (
-              <p style={{ color: 'var(--text-secondary)' }}>You haven't listed anything yet. Add your first item above.</p>
-            )}
-            {listings.map(l => (
-              <div key={l.listing_id} className="glass-panel" style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', opacity: l.listing_status === 'Removed' ? 0.55 : 1 }}>
-                <div>
-                  <h4>{l.item_name}</h4>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Price: ₹{l.selling_price} | Stock: {l.quantity_available} | Status: {l.listing_status}{l.room_number ? ` | Room ${l.room_number}` : ''}</p>
-                </div>
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
-                  {l.listing_status !== 'Removed' && (
-                    <button onClick={() => openEdit(l)} style={{ background: 'transparent', color: 'var(--primary-color)', border: 'none', cursor: 'pointer' }}>
-                      {l.listing_status === 'OutOfStock' ? 'Restock' : 'Edit'}
-                    </button>
-                  )}
-                  {l.listing_status !== 'Removed' && (
-                    <button onClick={() => handleDeleteListing(l.listing_id)} style={{ background: 'transparent', color: 'var(--secondary-color)', border: 'none', cursor: 'pointer' }}>Remove</button>
-                  )}
-                </div>
-              </div>
-            ))}
+      <main className="page" style={{ maxWidth: 1200 }}>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Seller Dashboard</h1>
+            <p className="page-subtitle">
+              {pendingCount > 0
+                ? <><strong style={{ color: 'var(--warning)' }}>{pendingCount} order{pendingCount > 1 ? 's' : ''}</strong> waiting for you to confirm.</>
+                : 'List things you want to sell and manage incoming orders.'}
+            </p>
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Received Orders */}
-        <div>
-          <h2 style={{ marginBottom: '1.5rem' }}>Received Orders</h2>
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.5rem' }}>
-            <button 
-              onClick={() => switchOrderTab('active')}
-              className="auth-btn" 
-              style={{ marginTop: 0, padding: '0.6rem 1rem', flex: 0, whiteSpace: 'nowrap', background: activeOrderTab === 'active' ? 'var(--primary-color)' : 'rgba(0,0,0,0.3)', color: activeOrderTab === 'active' ? '#000' : 'white', border: activeOrderTab === 'active' ? 'none' : '1px solid var(--border-color)' }}
-            >
-              Active Orders
-            </button>
-            <button 
-              onClick={() => switchOrderTab('history')}
-              className="auth-btn" 
-              style={{ marginTop: 0, padding: '0.6rem 1rem', flex: 0, whiteSpace: 'nowrap', background: activeOrderTab === 'history' ? 'var(--primary-color)' : 'rgba(0,0,0,0.3)', color: activeOrderTab === 'history' ? '#000' : 'white', border: activeOrderTab === 'history' ? 'none' : '1px solid var(--border-color)' }}
-            >
-              Order History
-            </button>
-          </div>
-
-          <OrderFilters value={orderFilters} onChange={setOrderFilters} statusOptions={STATUSES_FOR_TAB[activeOrderTab]} />
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {orders.map(o => (
-              <div key={o.order_id} className="glass-panel" style={{ padding: '1.5rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                  <h4 style={{ color: 'var(--primary-color)' }}>Order #{o.order_id}</h4>
-                  <span style={{ fontWeight: 'bold' }}>{o.order_status}</span>
+        <div className="seller-grid" style={{ padding: 0 }}>
+          {/* LEFT: add + manage listings */}
+          <div className="stack" style={{ gap: '1.5rem' }}>
+            <section className="card card-lg" aria-labelledby="add-listing">
+              <h2 id="add-listing" className="section-heading">Sell something</h2>
+              <form onSubmit={handleAddListing} className="stack">
+                <label className="field">
+                  <span>Item</span>
+                  <select className="input" value={newListing.item_id} onChange={(e) => set({ item_id: e.target.value })}>
+                    {Object.entries(itemsByCategory).map(([category, list]) => (
+                      <optgroup key={category} label={category}>
+                        {list.map(item => <option key={item.item_id} value={item.item_id}>{item.item_name} ({item.brand})</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                </label>
+                <div className="field-row">
+                  <label className="field">
+                    <span>MRP (₹)</span>
+                    <input className="input" type="number" min="0.01" step="0.01" inputMode="decimal" required placeholder="20.00"
+                      value={newListing.mrp} onChange={(e) => set({ mrp: e.target.value })} />
+                  </label>
+                  <label className="field">
+                    <span>Your price (₹)</span>
+                    <input className="input" type="number" min="0.01" step="0.01" inputMode="decimal" required placeholder="22.00"
+                      value={newListing.selling_price} onChange={(e) => set({ selling_price: e.target.value })} />
+                    <span className="field-hint">{maxPrice(newListing.mrp)}</span>
+                  </label>
                 </div>
-                <p style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>{new Date(o.created_at).toLocaleString()}</span><br />
-                  Buyer: {o.buyer_name} ({o.buyer_phone})<br />
-                  Item: {o.item_name} x{o.quantity}<br />
-                  Total: ₹{o.total_amount}
-                </p>
-                {o.buyer_rating && (
-                  <div style={{ marginBottom: '1rem', fontSize: '0.85rem' }}>
-                    Buyer rated you: <StarRating value={o.buyer_rating} />
-                    {o.buyer_review && <div style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>"{o.buyer_review}"</div>}
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  {o.order_status === 'Placed' && <button onClick={() => handleUpdateOrder(o.order_id, 'confirm')} className="auth-btn" style={{ flex: 1, marginTop: 0, padding: '0.5rem' }}>Confirm</button>}
-                  {o.order_status === 'Confirmed' && <button onClick={() => handleUpdateOrder(o.order_id, 'deliver')} className="auth-btn" style={{ flex: 1, marginTop: 0, padding: '0.5rem', background: 'linear-gradient(90deg, #00b09b, #96c93d)' }}>Mark Delivered</button>}
-                  <button onClick={() => navigate(`/chat/${o.order_id}`)} className="auth-btn" style={{ flex: 1, marginTop: 0, padding: '0.5rem', background: 'transparent', border: '1px solid var(--primary-color)' }}>Chat</button>
-                  {activeOrderTab === 'history' && (
-                    <button onClick={() => setReportModal({ show: true, order: o })} className="auth-btn" style={{ flex: 1, marginTop: 0, padding: '0.5rem', background: 'var(--secondary-color)', color: 'white' }}>Report</button>
-                  )}
+                <div className="field-row">
+                  <label className="field">
+                    <span>Quantity</span>
+                    <input className="input" type="number" min="1" max="1000" step="1" inputMode="numeric" required placeholder="1"
+                      value={newListing.quantity_available} onChange={(e) => set({ quantity_available: e.target.value })} />
+                  </label>
+                  <label className="field">
+                    <span>Room number</span>
+                    <input className="input" type="text" maxLength={50} required placeholder="K-204"
+                      value={newListing.room_number} onChange={(e) => set({ room_number: e.target.value })} />
+                  </label>
                 </div>
+                <label className="field">
+                  <span>Description (optional)</span>
+                  <input className="input" type="text" maxLength={500} placeholder="e.g. Sealed pack, bought yesterday"
+                    value={newListing.description} onChange={(e) => set({ description: e.target.value })} />
+                </label>
+                <div className="field">
+                  <span>Photo (optional)</span>
+                  <FilePicker
+                    inputKey={photoInputKey}
+                    value={newListing.photo_url}
+                    uploading={uploading && !editListing}
+                    capture="environment"
+                    label="Take or upload a photo"
+                    onChange={(e) => pickImage(e, (url) => set({ photo_url: url }), (msg) => toast(msg, 'error'))}
+                    onRemove={() => { set({ photo_url: '' }); setPhotoInputKey(k => k + 1); }}
+                  />
+                </div>
+                <button type="submit" className="btn btn-primary btn-block" disabled={uploading || creating}>
+                  {creating ? 'Listing…' : 'List item'}
+                </button>
+              </form>
+            </section>
+
+            <section aria-labelledby="my-listings">
+              <div className="row" style={{ justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                <h2 id="my-listings" className="section-heading" style={{ margin: 0 }}>My listings</h2>
+                {removedCount > 0 && <span className="muted small">{removedCount} removed hidden</span>}
               </div>
-            ))}
-            {orders.length === 0 && (
-              <p>{orderFilters.status || orderFilters.from || orderFilters.to ? 'No orders match these filters.' : `No ${activeOrderTab} orders found.`}</p>
-            )}
+              {visibleListings.length === 0 ? (
+                <EmptyState icon={<Store size={22} />} title="Nothing listed yet" text="Use the form above to put your first item up for sale." />
+              ) : (
+                <div className="stack" style={{ gap: '0.6rem' }}>
+                  {visibleListings.map(l => (
+                    <div key={l.listing_id} className="card listing-row">
+                      {l.photo_url
+                        ? <img className="listing-thumb" src={l.photo_url} alt="" />
+                        : <div className="listing-thumb" aria-hidden="true">{l.item_name.charAt(0)}</div>}
+                      <div className="listing-row-body">
+                        <div className="row" style={{ gap: '0.5rem', flexWrap: 'nowrap' }}>
+                          <span className="listing-row-name">{l.item_name}</span>
+                          <StatusBadge status={l.listing_status} />
+                        </div>
+                        <div className="listing-row-facts">
+                          <span>₹{Number(l.selling_price).toFixed(2)}</span>
+                          <span>{l.quantity_available} in stock</span>
+                          {l.room_number && <span>Room {l.room_number}</span>}
+                        </div>
+                      </div>
+                      <div className="listing-row-actions">
+                        <button className="btn btn-ghost btn-sm" onClick={() => openEdit(l)} aria-label={`Edit ${l.item_name}`}>
+                          {l.listing_status === 'OutOfStock' ? <><RotateCcw size={14} /> Restock</> : <><Pencil size={14} /> Edit</>}
+                        </button>
+                        <button className="btn btn-link danger btn-sm" onClick={() => handleDeleteListing(l)} aria-label={`Remove ${l.item_name}`}>
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
-        </div>
 
-      </div>
+          {/* RIGHT: received orders */}
+          <section aria-labelledby="received-orders">
+            <div className="row" style={{ justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <h2 id="received-orders" className="section-heading" style={{ margin: 0 }}>Received orders</h2>
+              <Tabs
+                label="Received orders"
+                value={activeOrderTab}
+                onChange={switchOrderTab}
+                items={[{ key: 'active', label: 'Active', count: pendingCount }, { key: 'history', label: 'History' }]}
+              />
+            </div>
+
+            <OrderFilters value={orderFilters} onChange={setOrderFilters} statusOptions={STATUSES_FOR_TAB[activeOrderTab]} />
+
+            {orders.length === 0 ? (
+              <EmptyState
+                icon={<Inbox size={22} />}
+                title={filtered ? 'No orders match these filters' : activeOrderTab === 'active' ? 'No orders to handle' : 'No past orders yet'}
+                text={filtered ? 'Try clearing the filters.' : activeOrderTab === 'active' ? "When someone buys from you, it shows up here." : 'Delivered and cancelled orders will appear here.'}
+              />
+            ) : (
+              <div className="stack">
+                {orders.map(o => (
+                  <OrderCard key={o.order_id} order={o} role="seller">
+                    {o.order_status === 'Placed' && (
+                      <button className="btn btn-primary btn-sm" onClick={() => handleUpdateOrder(o.order_id, 'confirm')}>
+                        <Check size={15} /> Confirm order
+                      </button>
+                    )}
+                    {o.order_status === 'Confirmed' && (
+                      <button className="btn btn-success btn-sm" onClick={() => handleUpdateOrder(o.order_id, 'deliver')}>
+                        <PackageCheck size={15} /> Mark delivered
+                      </button>
+                    )}
+                    {o.order_status !== 'Cancelled' && (
+                      <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/chat/${o.order_id}`)}>
+                        <MessageCircle size={15} /> Chat
+                      </button>
+                    )}
+                    {activeOrderTab === 'history' && (
+                      <button className="btn btn-link danger btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setReporting(o)}>
+                        <Flag size={14} /> Report
+                      </button>
+                    )}
+                  </OrderCard>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      </main>
 
       {editListing && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
-          <div className="glass-panel" style={{ padding: '2rem', width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3 style={{ marginBottom: '1rem' }}>Edit: {editListing.item_name}</h3>
-            {editError && <div className="auth-error" style={{ marginBottom: '1rem' }}>{editError}</div>}
-            <form onSubmit={handleSaveEdit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <label style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  MRP (₹)
-                  <input type="number" min="0.01" step="0.01" required value={editListing.mrp} onChange={(e) => setEditListing({ ...editListing, mrp: e.target.value })} style={fieldStyle} />
-                </label>
-                <label style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  Selling price (₹)
-                  <input type="number" min="0.01" step="0.01" required value={editListing.selling_price} onChange={(e) => setEditListing({ ...editListing, selling_price: e.target.value })} style={fieldStyle} />
-                </label>
-              </div>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                Quantity available (0 = out of stock)
-                <input type="number" min="0" max="1000" step="1" required value={editListing.quantity_available} onChange={(e) => setEditListing({ ...editListing, quantity_available: e.target.value })} style={fieldStyle} />
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="edit-title">
+          <form className="modal stack" onSubmit={handleSaveEdit}>
+            <div>
+              <h3 id="edit-title" className="modal-title">Edit listing</h3>
+              <p className="muted small">{editListing.item_name}</p>
+            </div>
+            {editError && <div className="alert alert-error" role="alert">{editError}</div>}
+            <div className="field-row">
+              <label className="field">
+                <span>MRP (₹)</span>
+                <input className="input" type="number" min="0.01" step="0.01" required value={editListing.mrp} onChange={(e) => setEdit({ mrp: e.target.value })} />
               </label>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                Room number
-                <input type="text" required maxLength={50} value={editListing.room_number} onChange={(e) => setEditListing({ ...editListing, room_number: e.target.value })} style={fieldStyle} />
+              <label className="field">
+                <span>Your price (₹)</span>
+                <input className="input" type="number" min="0.01" step="0.01" required value={editListing.selling_price} onChange={(e) => setEdit({ selling_price: e.target.value })} />
+                <span className="field-hint">{maxPrice(editListing.mrp)}</span>
               </label>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                Description
-                <input type="text" maxLength={500} value={editListing.description} onChange={(e) => setEditListing({ ...editListing, description: e.target.value })} style={fieldStyle} />
+            </div>
+            <div className="field-row">
+              <label className="field">
+                <span>Quantity</span>
+                <input className="input" type="number" min="0" max="1000" step="1" required value={editListing.quantity_available} onChange={(e) => setEdit({ quantity_available: e.target.value })} />
+                <span className="field-hint">0 = out of stock</span>
               </label>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                Replace photo (optional)
-                <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" onChange={handleEditPhoto} style={fieldStyle} />
-                {uploading && <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)' }}>Uploading…</span>}
+              <label className="field">
+                <span>Room number</span>
+                <input className="input" type="text" required maxLength={50} placeholder="K-204" value={editListing.room_number} onChange={(e) => setEdit({ room_number: e.target.value })} />
               </label>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <button type="submit" disabled={uploading} className="auth-btn" style={{ flex: 1, marginTop: 0, opacity: uploading ? 0.6 : 1 }}>Save changes</button>
-                <button type="button" onClick={() => setEditListing(null)} className="auth-btn" style={{ flex: 1, marginTop: 0, background: 'transparent', border: '1px solid var(--text-secondary)' }}>Cancel</button>
-              </div>
-            </form>
-          </div>
+            </div>
+            <label className="field">
+              <span>Description</span>
+              <input className="input" type="text" maxLength={500} value={editListing.description} onChange={(e) => setEdit({ description: e.target.value })} />
+            </label>
+            <div className="field">
+              <span>Photo</span>
+              <FilePicker
+                value={editListing.photo_url !== undefined ? editListing.photo_url : editListing.current_photo}
+                uploading={uploading}
+                label="Replace photo"
+                onChange={(e) => pickImage(e, (url) => setEdit({ photo_url: url }), setEditError)}
+                onRemove={() => setEdit({ photo_url: '' })}
+              />
+            </div>
+            <div className="row" style={{ justifyContent: 'flex-end' }}>
+              <button type="button" className="btn btn-ghost" onClick={() => setEditListing(null)}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={uploading}>Save changes</button>
+            </div>
+          </form>
         </div>
       )}
 
-      {reportModal.show && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div className="glass-panel" style={{ padding: '2rem', width: '90%', maxWidth: '500px' }}>
-            <h3 style={{ marginBottom: '1rem', color: 'var(--secondary-color)' }}>Report Order #{reportModal.order.order_id}</h3>
-            <p style={{ fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--text-secondary)' }}>Report Buyer: {reportModal.order.buyer_name}</p>
-            <form onSubmit={submitReport} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <textarea 
-                placeholder="Why are you reporting this? Please provide details." 
-                required 
-                value={reportReason} 
-                onChange={e => setReportReason(e.target.value)}
-                style={{ padding: '1rem', borderRadius: '12px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)', minHeight: '100px', resize: 'vertical' }}
-              />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Attach Proof (Image)</label>
-                <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" onChange={handleReportFileChange} style={{ padding: '0.8rem', borderRadius: '12px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' }} />
-                {uploading && <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)' }}>Uploading…</span>}
-              </div>
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                <button type="submit" disabled={uploading} className="auth-btn" style={{ flex: 1, marginTop: 0, background: 'var(--secondary-color)', opacity: uploading ? 0.6 : 1 }}>Submit Report</button>
-                <button type="button" onClick={() => { setReportModal({ show: false, order: null }); setReportReason(''); setReportProof(''); }} className="auth-btn" style={{ flex: 1, marginTop: 0, background: 'transparent', border: '1px solid var(--text-secondary)' }}>Cancel</button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {reporting && (
+        <ReportDialog
+          order={reporting}
+          reportedUserId={reporting.buyer_id}
+          reportedName={reporting.buyer_name}
+          roleLabel="Buyer"
+          onClose={() => setReporting(null)}
+        />
       )}
     </>
   );

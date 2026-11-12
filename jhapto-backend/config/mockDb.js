@@ -636,16 +636,21 @@ const query = async (sql, params = []) => {
   }
 
   // 23. Messages: Check order participants
-  if (/SELECT o\.buyer_id, l\.seller_id, o\.order_status FROM `Order` o/i.test(cleanSql)) {
+  if (/SELECT o\.buyer_id, l\.seller_id, o\.order_status(, oi\.quantity, i\.item_name.*)? FROM `Order` o/i.test(cleanSql)) {
     const order_id = Number(params[0]);
     const o = orders.find(ord => ord.order_id === order_id);
     if (!o) return [[]];
     const oi = order_items.find(item => item.order_id === order_id);
     const l = oi ? listings.find(lst => lst.listing_id === oi.listing_id) : null;
+    const name = (id) => (students.find(st => st.student_id === id) || {}).name;
     return [[{
       buyer_id: o.buyer_id,
       seller_id: l ? l.seller_id : null,
-      order_status: o.order_status
+      order_status: o.order_status,
+      quantity: oi ? oi.quantity : 1,
+      item_name: orderInfo(order_id).item_name,
+      buyer_name: name(o.buyer_id),
+      seller_name: l ? name(l.seller_id) : null,
     }]];
   }
 

@@ -1,16 +1,6 @@
 import React from 'react';
+import { categoryIcon } from '../utils/categoryIcons';
 import './CategoryList.css';
-
-// Icons for the categories created by jhapto_migrations_v3.sql; anything else gets 🛒
-const ICONS = {
-  'Snacks & Food': '🍿',
-  'Noodles & Instant Food': '🍜',
-  'Beverages': '🧃',
-  'Chocolates & Sweets': '🍫',
-  'Stationery & Books': '🖊️',
-  'Personal Care': '🪥',
-  'Electronics & Accessories': '🔌',
-};
 
 // Short labels so the cards stay compact
 const shortName = (name) => name.split(' & ')[0];
@@ -37,7 +27,7 @@ const CategoryList = ({ categories, selectedCategory, onSelectCategory }) => {
                 ...(active ? { borderColor: 'var(--primary-color)', background: 'rgba(69, 243, 255, 0.1)', transform: 'translateY(-5px)', boxShadow: '0 10px 20px rgba(0, 0, 0, 0.3)' } : {}),
               }}
             >
-              <div className="category-icon">{ICONS[category.category_name] || '🛒'}</div>
+              <div className="category-icon">{categoryIcon(category.category_name)}</div>
               <span className="category-name">{shortName(category.category_name)}</span>
             </button>
           );

@@ -66,10 +66,14 @@ router.get('/:order_id', auth, async (req, res) => {
   try {
     // Verify the requester is the buyer or seller of this order
     const [orderRows] = await db.query(
-      `SELECT o.buyer_id, l.seller_id, o.order_status
+      `SELECT o.buyer_id, l.seller_id, o.order_status, oi.quantity, i.item_name,
+              buyer.name AS buyer_name, seller.name AS seller_name
        FROM \`Order\` o
-       JOIN Order_Item oi ON o.order_id    = oi.order_id
-       JOIN Listing    l  ON oi.listing_id = l.listing_id
+       JOIN Order_Item oi     ON o.order_id    = oi.order_id
+       JOIN Listing    l      ON oi.listing_id = l.listing_id
+       JOIN Item       i      ON l.item_id     = i.item_id
+       JOIN Student    buyer  ON o.buyer_id    = buyer.student_id
+       JOIN Student    seller ON l.seller_id   = seller.student_id
        WHERE o.order_id = ? LIMIT 1`,
       [order_id]
     );
@@ -78,7 +82,7 @@ router.get('/:order_id', auth, async (req, res) => {
       return res.status(404).json({ message: 'Order not found.' });
     }
 
-    const { buyer_id, seller_id, order_status } = orderRows[0];
+    const { buyer_id, seller_id, order_status, quantity, item_name, buyer_name, seller_name } = orderRows[0];
     if (student_id !== buyer_id && student_id !== seller_id) {
       return res.status(403).json({ message: 'Not authorised to view these messages.' });
     }
@@ -101,7 +105,12 @@ router.get('/:order_id', auth, async (req, res) => {
       [order_id]
     );
 
-    res.json({ order_status, messages });
+    const iAmBuyer = student_id === buyer_id;
+    res.json({
+      order_status,
+      messages,
+      order: { item_name, quantity, role: iAmBuyer ? 'buyer' : 'seller', other_name: iAmBuyer ? seller_name : buyer_name },
+    });
   } catch (err) {
     res.status(500).json({ message: 'Error fetching messages.', error: err.message });
   }

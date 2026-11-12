@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useContext, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Send, Lock } from 'lucide-react';
+import StatusBadge from '../components/StatusBadge';
+import '../components/Chat.css';
 import Header from '../components/Header';
 import { AuthContext } from '../contexts/AuthContext';
 import api from '../utils/api';
@@ -9,6 +12,7 @@ const ChatPage = () => {
   const { order_id } = useParams();
   const [messages, setMessages] = useState([]);
   const [orderStatus, setOrderStatus] = useState('');
+  const [orderInfo, setOrderInfo] = useState(null);   // { item_name, quantity, role, other_name }
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
@@ -24,6 +28,7 @@ const ChatPage = () => {
       const res = await api.get(`/messages/${order_id}`);
       setMessages(res.data.messages || []);
       setOrderStatus(res.data.order_status);
+      if (res.data.order) setOrderInfo(res.data.order);
       setError('');
     } catch (err) {
       const status = err.response?.status;
@@ -101,79 +106,84 @@ const ChatPage = () => {
     return (
       <>
         <Header user={user} onLogout={logout} onOrdersClick={() => navigate('/orders')} onSellerClick={() => navigate('/seller')} />
-        <div style={{ padding: '2rem 1rem', maxWidth: '800px', margin: '0 auto' }}>
-          <h2 className="text-gradient" style={{ marginBottom: '1rem' }}>Chat - Order #{order_id}</h2>
-          <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
-            <p style={{ marginBottom: '1rem' }}>{blocked}</p>
-            <button className="auth-btn" style={{ marginTop: 0, padding: '0.6rem 1.5rem' }} onClick={() => navigate('/orders')}>Go to my orders</button>
+        <main className="page page-narrow">
+          <div className="empty-state">
+            <div className="empty-state-icon" aria-hidden="true"><Lock size={22} /></div>
+            <h3>Chat not available</h3>
+            <p>{blocked}</p>
+            <button className="btn btn-primary" onClick={() => navigate('/orders')}>Go to my orders</button>
           </div>
-        </div>
+        </main>
       </>
     );
   }
 
+  const backTo = orderInfo?.role === 'seller' ? '/seller' : '/orders';
+  const timeOf = (d) => new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
   return (
     <>
       <Header user={user} onLogout={logout} onOrdersClick={() => navigate('/orders')} onSellerClick={() => navigate('/seller')} />
-      <div style={{ padding: '2rem 1rem', maxWidth: '800px', margin: '0 auto', height: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1rem', gap: '1rem' }}>
-          <h2 className="text-gradient">Chat - Order #{order_id}</h2>
-          <span style={{ fontSize: '0.8rem', color: live ? '#2ecc71' : 'var(--text-secondary)' }} title={live ? 'New messages appear instantly' : 'Reconnecting…'}>
-            {live ? '● Live' : '○ Connecting…'}
-          </span>
+      <main className="chat-page">
+        <div className="card chat-header">
+          <button className="btn btn-ghost btn-sm" onClick={() => navigate(backTo)} aria-label="Back to orders">
+            <ArrowLeft size={16} />
+          </button>
+          <div className="chat-header-text">
+            <div className="chat-header-title">{orderInfo ? orderInfo.other_name : `Order #${order_id}`}</div>
+            <div className="muted small chat-header-sub">
+              {orderInfo ? `${orderInfo.role === 'buyer' ? 'Seller' : 'Buyer'} · ${orderInfo.item_name} × ${orderInfo.quantity} · Order #${order_id}` : 'Loading…'}
+            </div>
+          </div>
+          <div className="chat-header-side">
+            {orderStatus && <StatusBadge status={orderStatus} />}
+            <span className={`chat-live ${live ? 'on' : ''}`} title={live ? 'New messages appear instantly' : 'Reconnecting…'}>
+              {live ? 'Live' : 'Connecting…'}
+            </span>
+          </div>
         </div>
 
-        {error && <div className="auth-error" style={{ marginBottom: '1rem' }}>{error}</div>}
+        {error && <div className="alert alert-error" role="alert">{error}</div>}
 
-        <div ref={listRef} className="glass-panel" aria-live="polite" style={{ flex: 1, padding: '1rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1rem' }}>
-          {messages.length === 0 && <p style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>No messages yet. Say hi!</p>}
-          {messages.map(msg => {
+        <div ref={listRef} className="card chat-messages" aria-live="polite">
+          {messages.length === 0 && (
+            <p className="chat-empty">No messages yet.{orderStatus === 'Confirmed' ? ' Say hi and agree where to meet!' : ''}</p>
+          )}
+          {messages.map((msg, i) => {
             const isMe = Number(msg.sender_id) === Number(user.student_id);
+            const prev = messages[i - 1];
+            const grouped = prev && prev.sender_id === msg.sender_id;
             return (
-              <div key={msg.message_id} style={{
-                alignSelf: isMe ? 'flex-end' : 'flex-start',
-                background: isMe ? 'linear-gradient(90deg, var(--primary-color), #00d2ff)' : 'rgba(255,255,255,0.1)',
-                color: isMe ? '#000' : '#fff',
-                padding: '0.8rem 1.2rem',
-                borderRadius: '16px',
-                borderBottomRightRadius: isMe ? '4px' : '16px',
-                borderBottomLeftRadius: isMe ? '16px' : '4px',
-                maxWidth: '70%',
-                wordBreak: 'break-word',
-              }}>
-                {!isMe && <div style={{ fontSize: '0.7rem', fontWeight: 'bold', marginBottom: '0.2rem', opacity: 0.7 }}>{msg.sender_name}</div>}
+              <div key={msg.message_id} className={`bubble ${isMe ? 'mine' : 'theirs'} ${grouped ? 'grouped' : ''}`}>
                 <div>{msg.message_text}</div>
-                <div style={{ fontSize: '0.65rem', opacity: 0.6, marginTop: '0.25rem', textAlign: 'right' }}>
-                  {new Date(msg.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </div>
+                <div className="bubble-time">{timeOf(msg.sent_at)}</div>
               </div>
             );
           })}
         </div>
 
         {orderStatus === 'Placed' ? (
-          <div style={{ textAlign: 'center', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', color: 'var(--text-secondary)' }}>
-            This chat is locked. You can only chat after the seller confirms this order.
-          </div>
+          <div className="chat-notice"><Lock size={15} /> Chat opens once the seller confirms this order.</div>
         ) : ['Delivered', 'Cancelled'].includes(orderStatus) ? (
-          <div style={{ textAlign: 'center', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', color: 'var(--text-secondary)' }}>
-            This chat is closed because the order is {orderStatus.toLowerCase()}.
-          </div>
-        ) : (
-          <form onSubmit={handleSend} style={{ display: 'flex', gap: '1rem' }}>
+          <div className="chat-notice"><Lock size={15} /> This chat is closed because the order was {orderStatus.toLowerCase()}.</div>
+        ) : orderStatus ? (
+          <form onSubmit={handleSend} className="chat-composer">
             <input
+              className="input"
               type="text"
               value={newMessage}
               maxLength={1000}
               onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type a message..."
+              placeholder={orderInfo ? `Message ${orderInfo.other_name.split(' ')[0]}…` : 'Type a message…'}
               aria-label="Message"
-              style={{ flex: 1, padding: '1rem', borderRadius: '12px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)', outline: 'none' }}
+              autoComplete="off"
             />
-            <button type="submit" disabled={sending || !newMessage.trim()} className="auth-btn" style={{ marginTop: 0, padding: '0 2rem', opacity: sending ? 0.6 : 1 }}>Send</button>
+            <button type="submit" className="btn btn-primary" disabled={sending || !newMessage.trim()} aria-label="Send message">
+              <Send size={17} />
+            </button>
           </form>
-        )}
-      </div>
+        ) : null}
+      </main>
     </>
   );
 };
