@@ -1,0 +1,619 @@
+// config/mockDb.js (used when USE_MOCK_DB=true)
+// In-memory mock database for Jhapto - provides full relational logic, procedures, and seed data
+
+const bcrypt = require('bcryptjs');
+
+// ── Initial Seed Data ──────────────────────────────────────────
+const hostels = [
+  { hostel_id: 1, hostel_name: 'Kailash Hostel', hostel_code: 'KH01' }
+];
+
+const floors = [
+  { floor_id: 1, floor_number: 1, hostel_id: 1 },
+  { floor_id: 2, floor_number: 2, hostel_id: 1 },
+  { floor_id: 3, floor_number: 3, hostel_id: 1 },
+  { floor_id: 4, floor_number: 4, hostel_id: 1 },
+  { floor_id: 5, floor_number: 5, hostel_id: 1 },
+  { floor_id: 6, floor_number: 6, hostel_id: 1 }
+];
+
+const defaultPasswordHash = bcrypt.hashSync('password123', 10);
+const defaultAdminPasswordHash = bcrypt.hashSync('admin123', 10);
+
+const admins = [
+  {
+    admin_id: 1,
+    name: 'Admin Jhapto',
+    email: 'admin@jhapto.com',
+    password_hash: defaultAdminPasswordHash,
+    created_at: new Date('2026-01-01T00:00:00Z')
+  }
+];
+
+const students = [
+  { student_id: 1, name: 'Aarav Sharma', email: 'aarav@tiet.ac.in', phone_no: '9876543210', password_hash: defaultPasswordHash, hostel_id: 1, floor_id: 1, is_banned: false, created_at: new Date('2026-01-02T10:00:00Z') },
+  { student_id: 2, name: 'Priya Mehta', email: 'priya@tiet.ac.in', phone_no: '9876543211', password_hash: defaultPasswordHash, hostel_id: 1, floor_id: 1, is_banned: false, created_at: new Date('2026-01-02T11:00:00Z') },
+  { student_id: 3, name: 'Rohan Verma', email: 'rohan@tiet.ac.in', phone_no: '9876543212', password_hash: defaultPasswordHash, hostel_id: 1, floor_id: 2, is_banned: false, created_at: new Date('2026-01-02T12:00:00Z') },
+  { student_id: 4, name: 'Sneha Gupta', email: 'sneha@tiet.ac.in', phone_no: '9876543213', password_hash: defaultPasswordHash, hostel_id: 1, floor_id: 3, is_banned: false, created_at: new Date('2026-01-02T13:00:00Z') },
+  { student_id: 5, name: 'Karan Singh', email: 'karan@tiet.ac.in', phone_no: '9876543214', password_hash: defaultPasswordHash, hostel_id: 1, floor_id: 4, is_banned: false, created_at: new Date('2026-01-02T14:00:00Z') }
+];
+
+const categories = [
+  { category_id: 1, category_name: 'Snacks & Food' },
+  { category_id: 2, category_name: 'Beverages' },
+  { category_id: 3, category_name: 'Stationery & Books' },
+  { category_id: 4, category_name: 'Electronics & Accessories' },
+  { category_id: 5, category_name: 'Personal Care' }
+];
+
+const items = [
+  { item_id: 1, item_name: 'Lays Classic Salted', brand: 'Lays', category_id: 1 },
+  { item_id: 2, item_name: 'Maggi Noodles 2-min', brand: 'Maggi', category_id: 1 },
+  { item_id: 3, item_name: 'Dark Fantasy Choco Fills', brand: 'Sunfeast', category_id: 1 },
+  { item_id: 4, item_name: 'Amul Kool Milk', brand: 'Amul', category_id: 2 },
+  { item_id: 5, item_name: 'Kurkure Masala Munch', brand: 'Kurkure', category_id: 1 },
+  { item_id: 6, item_name: 'Classmate Spiral Notebook', brand: 'Classmate', category_id: 3 },
+  { item_id: 7, item_name: 'Pilot V5 Hi-Tecpoint Pen', brand: 'Pilot', category_id: 3 },
+  { item_id: 8, item_name: 'USB Type-C Fast Cable', brand: 'boAt', category_id: 4 }
+];
+
+const listings = [
+  { listing_id: 1, seller_id: 1, item_id: 1, mrp: 20.00, selling_price: 22.00, quantity_available: 5, description: 'Fresh pack, bought yesterday', photo_url: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?auto=format&fit=crop&w=400&q=80', listing_status: 'Active', room_number: '104', created_at: new Date('2026-02-01T10:00:00Z') },
+  { listing_id: 2, seller_id: 2, item_id: 2, mrp: 14.00, selling_price: 15.00, quantity_available: 3, description: 'Masala flavor available', photo_url: 'https://images.unsplash.com/photo-1612927601601-6638404737ce?auto=format&fit=crop&w=400&q=80', listing_status: 'Active', room_number: '112', created_at: new Date('2026-02-01T11:00:00Z') },
+  { listing_id: 3, seller_id: 3, item_id: 3, mrp: 50.00, selling_price: 55.00, quantity_available: 2, description: 'Sealed pack, chocolate flavor', photo_url: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?auto=format&fit=crop&w=400&q=80', listing_status: 'Active', room_number: '208', created_at: new Date('2026-02-01T12:00:00Z') },
+  { listing_id: 4, seller_id: 4, item_id: 4, mrp: 30.00, selling_price: 30.00, quantity_available: 10, description: 'Cold, fresh from canteen', photo_url: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=400&q=80', listing_status: 'Active', room_number: '315', created_at: new Date('2026-02-01T13:00:00Z') },
+  { listing_id: 5, seller_id: 5, item_id: 5, mrp: 20.00, selling_price: 20.00, quantity_available: 7, description: 'Full party pack munchies', photo_url: 'https://images.unsplash.com/photo-1599490659213-e2b9527bd087?auto=format&fit=crop&w=400&q=80', listing_status: 'Active', room_number: '402', created_at: new Date('2026-02-01T14:00:00Z') },
+  { listing_id: 6, seller_id: 1, item_id: 6, mrp: 80.00, selling_price: 75.00, quantity_available: 4, description: 'Unused Classmate 300-page ruled notebook', photo_url: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=400&q=80', listing_status: 'Active', room_number: '104', created_at: new Date('2026-02-02T09:00:00Z') }
+];
+
+const orders = [
+  { order_id: 1, buyer_id: 3, order_status: 'Delivered', total_amount: 22.00, created_at: new Date('2026-02-02T10:00:00Z') },
+  { order_id: 2, buyer_id: 1, order_status: 'Placed', total_amount: 15.00, created_at: new Date('2026-02-02T11:00:00Z') },
+  { order_id: 3, buyer_id: 2, order_status: 'Confirmed', total_amount: 30.00, created_at: new Date('2026-02-02T12:00:00Z') }
+];
+
+const order_items = [
+  { order_item_id: 1, order_id: 1, listing_id: 1, quantity: 1, price_at_purchase: 22.00 },
+  { order_item_id: 2, order_id: 2, listing_id: 2, quantity: 1, price_at_purchase: 15.00 },
+  { order_item_id: 3, order_id: 3, listing_id: 4, quantity: 1, price_at_purchase: 30.00 }
+];
+
+const messages = [
+  { message_id: 1, order_id: 2, sender_id: 1, receiver_id: 2, message_text: 'Hi! I ordered Maggi. When can I pick it up?', is_read: true, sent_at: new Date('2026-02-02T11:05:00Z') },
+  { message_id: 2, order_id: 2, sender_id: 2, receiver_id: 1, message_text: 'Come to room 112 after 6 PM!', is_read: false, sent_at: new Date('2026-02-02T11:08:00Z') }
+];
+
+const reports = [];
+
+let nextStudentId = 10;
+let nextAdminId = 10;
+let nextListingId = 20;
+let nextOrderId = 10;
+let nextOrderItemId = 20;
+let nextMessageId = 20;
+let nextReportId = 10;
+
+let lastPlacedOrderResult = { order_id: -1, message: '' };
+
+// ── In-Memory Query Engine ─────────────────────────────────────
+const query = async (sql, params = []) => {
+  const cleanSql = sql.trim().replace(/\s+/g, ' ');
+
+  // 1. CALL sp_floor_priority_listings(?)
+  if (/CALL sp_floor_priority_listings/i.test(cleanSql)) {
+    const buyer_floor_id = Number(params[0]);
+    const activeListings = listings.filter(l => {
+      const seller = students.find(s => s.student_id === l.seller_id);
+      return l.listing_status === 'Active' && seller && !seller.is_banned;
+    });
+
+    const result = activeListings.map(l => {
+      const seller = students.find(s => s.student_id === l.seller_id);
+      const floor = floors.find(f => f.floor_id === seller?.floor_id);
+      const item = items.find(i => i.item_id === l.item_id);
+      const priority_rank = (seller?.floor_id === buyer_floor_id) ? 0 : 1;
+      return {
+        listing_id: l.listing_id,
+        item_name: item ? item.item_name : 'Item',
+        seller_name: seller ? seller.name : 'Unknown',
+        seller_floor: floor ? floor.floor_number : 1,
+        seller_floor_num: floor ? floor.floor_number : 1,
+        selling_price: Number(l.selling_price),
+        mrp: Number(l.mrp),
+        quantity_available: Number(l.quantity_available),
+        description: l.description,
+        photo_url: l.photo_url,
+        room_number: l.room_number,
+        priority_rank
+      };
+    }).sort((a, b) => {
+      if (a.priority_rank !== b.priority_rank) return a.priority_rank - b.priority_rank;
+      return b.listing_id - a.listing_id;
+    });
+
+    return [[result]];
+  }
+
+  // 2. CALL sp_admin_report()
+  if (/CALL sp_admin_report/i.test(cleanSql)) {
+    const reportRows = students.filter(s => !s.is_banned).map(s => {
+      const floor = floors.find(f => f.floor_id === s.floor_id);
+      const total_listings = listings.filter(l => l.seller_id === s.student_id).length;
+      const total_orders = orders.filter(o => o.buyer_id === s.student_id && o.order_status !== 'Cancelled').length;
+
+      // revenue earned as seller
+      let total_revenue = 0;
+      orders.filter(o => o.order_status !== 'Cancelled').forEach(o => {
+        const itemRows = order_items.filter(oi => oi.order_id === o.order_id);
+        itemRows.forEach(oi => {
+          const l = listings.find(lst => lst.listing_id === oi.listing_id);
+          if (l && l.seller_id === s.student_id) {
+            total_revenue += (Number(oi.price_at_purchase) * Number(oi.quantity));
+          }
+        });
+      });
+
+      return {
+        student_id: s.student_id,
+        student_name: s.name,
+        floor_number: floor ? floor.floor_number : 1,
+        total_listings,
+        total_orders,
+        total_revenue: Number(total_revenue.toFixed(2))
+      };
+    }).sort((a, b) => b.total_revenue - a.total_revenue);
+
+    return [[reportRows]];
+  }
+
+  // 3. CALL place_order(?, ?, ?, @order_id, @message)
+  if (/CALL place_order/i.test(cleanSql)) {
+    const buyer_id = Number(params[0]);
+    const listing_id = Number(params[1]);
+    const quantity = Number(params[2]);
+
+    const listing = listings.find(l => l.listing_id === listing_id);
+    if (!listing || listing.listing_status !== 'Active') {
+      lastPlacedOrderResult = { order_id: -1, message: 'ERROR: Listing is not active or does not exist.' };
+      return [{ affectedRows: 0 }];
+    }
+
+    if (listing.quantity_available < quantity) {
+      lastPlacedOrderResult = { order_id: -1, message: 'ERROR: Not enough stock available.' };
+      return [{ affectedRows: 0 }];
+    }
+
+    // Deduct stock
+    listing.quantity_available -= quantity;
+    if (listing.quantity_available <= 0) {
+      listing.quantity_available = 0;
+      listing.listing_status = 'OutOfStock';
+    }
+
+    const newOrderId = nextOrderId++;
+    const totalAmount = Number(listing.selling_price) * quantity;
+
+    orders.push({
+      order_id: newOrderId,
+      buyer_id,
+      order_status: 'Placed',
+      total_amount: totalAmount,
+      created_at: new Date()
+    });
+
+    order_items.push({
+      order_item_id: nextOrderItemId++,
+      order_id: newOrderId,
+      listing_id,
+      quantity,
+      price_at_purchase: Number(listing.selling_price)
+    });
+
+    lastPlacedOrderResult = { order_id: newOrderId, message: 'SUCCESS: Order placed successfully.' };
+    return [{ affectedRows: 1 }];
+  }
+
+  // 4. SELECT @order_id AS order_id, @message AS message
+  if (/SELECT @order_id AS order_id/i.test(cleanSql)) {
+    return [[[lastPlacedOrderResult]]];
+  }
+
+  // 5. SELECT fn_is_price_valid(?, ?) AS valid
+  if (/fn_is_price_valid/i.test(cleanSql)) {
+    const mrp = Number(params[0]);
+    const price = Number(params[1]);
+    const isValid = price <= 1.5 * mrp ? 1 : 0;
+    return [[{ valid: isValid }]];
+  }
+
+  // 6. Student Register Checks & Inserts
+  if (/SELECT student_id FROM Student WHERE email =/i.test(cleanSql)) {
+    const found = students.filter(s => s.email.toLowerCase() === String(params[0]).toLowerCase());
+    return [found.map(s => ({ student_id: s.student_id }))];
+  }
+
+  if (/SELECT student_id FROM Student WHERE phone_no =/i.test(cleanSql)) {
+    const found = students.filter(s => s.phone_no === String(params[0]));
+    return [found.map(s => ({ student_id: s.student_id }))];
+  }
+
+  if (/INSERT INTO Student/i.test(cleanSql)) {
+    const [name, email, phone_no, password_hash, hostel_id, floor_id] = params;
+    const newStudent = {
+      student_id: nextStudentId++,
+      name,
+      email,
+      phone_no,
+      password_hash,
+      hostel_id: Number(hostel_id),
+      floor_id: Number(floor_id),
+      is_banned: false,
+      created_at: new Date()
+    };
+    students.push(newStudent);
+    return [{ insertId: newStudent.student_id, affectedRows: 1 }];
+  }
+
+  // 7. Student Login
+  if (/SELECT .* FROM Student WHERE email =/i.test(cleanSql)) {
+    const found = students.filter(s => s.email.toLowerCase() === String(params[0]).toLowerCase());
+    return [found];
+  }
+
+  // 8. Admin Register & Login
+  if (/SELECT admin_id FROM Admin WHERE email =/i.test(cleanSql)) {
+    const found = admins.filter(a => a.email.toLowerCase() === String(params[0]).toLowerCase());
+    return [found.map(a => ({ admin_id: a.admin_id }))];
+  }
+
+  if (/INSERT INTO Admin/i.test(cleanSql)) {
+    const [name, email, password_hash] = params;
+    const newAdmin = {
+      admin_id: nextAdminId++,
+      name,
+      email,
+      password_hash,
+      created_at: new Date()
+    };
+    admins.push(newAdmin);
+    return [{ insertId: newAdmin.admin_id, affectedRows: 1 }];
+  }
+
+  if (/SELECT \* FROM Admin WHERE email =/i.test(cleanSql)) {
+    const found = admins.filter(a => a.email.toLowerCase() === String(params[0]).toLowerCase());
+    return [found];
+  }
+
+  // 9. Admin Listings View
+  if (/SELECT \* FROM vw_admin_listings/i.test(cleanSql)) {
+    const rows = listings.map(l => {
+      const seller = students.find(s => s.student_id === l.seller_id);
+      const floor = floors.find(f => f.floor_id === seller?.floor_id);
+      const item = items.find(i => i.item_id === l.item_id);
+      return {
+        listing_id: l.listing_id,
+        seller_name: seller ? seller.name : 'Unknown',
+        seller_email: seller ? seller.email : '',
+        seller_floor: floor ? floor.floor_number : 1,
+        item_name: item ? item.item_name : 'Item',
+        mrp: Number(l.mrp),
+        selling_price: Number(l.selling_price),
+        price_is_valid: Number(l.selling_price) <= 1.5 * Number(l.mrp) ? 1 : 0,
+        quantity_available: Number(l.quantity_available),
+        listing_status: l.listing_status,
+        created_at: l.created_at
+      };
+    }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    return [rows];
+  }
+
+  // 10. Admin Students View
+  if (/SELECT s\.student_id, s\.name, s\.email, s\.phone_no/i.test(cleanSql)) {
+    const rows = students.map(s => {
+      const floor = floors.find(f => f.floor_id === s.floor_id);
+      return {
+        student_id: s.student_id,
+        name: s.name,
+        email: s.email,
+        phone_no: s.phone_no,
+        floor_number: floor ? floor.floor_number : 1,
+        is_banned: Boolean(s.is_banned),
+        created_at: s.created_at
+      };
+    }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    return [rows];
+  }
+
+  // 11. Student Ban / Unban
+  if (/UPDATE Student SET is_banned = TRUE WHERE student_id =/i.test(cleanSql)) {
+    const id = Number(params[0]);
+    const s = students.find(st => st.student_id === id);
+    if (s) s.is_banned = true;
+    return [{ affectedRows: 1 }];
+  }
+
+  if (/UPDATE Student SET is_banned = FALSE WHERE student_id =/i.test(cleanSql)) {
+    const id = Number(params[0]);
+    const s = students.find(st => st.student_id === id);
+    if (s) s.is_banned = false;
+    return [{ affectedRows: 1 }];
+  }
+
+  // 12. Items List for Sell dropdown
+  if (/SELECT i\.item_id, i\.item_name, i\.brand, c\.category_name/i.test(cleanSql)) {
+    const rows = items.map(i => {
+      const c = categories.find(cat => cat.category_id === i.category_id);
+      return {
+        item_id: i.item_id,
+        item_name: i.item_name,
+        brand: i.brand,
+        category_name: c ? c.category_name : 'General'
+      };
+    }).sort((a, b) => a.item_name.localeCompare(b.item_name));
+    return [rows];
+  }
+
+  // 13. My Listings (Seller)
+  if (/FROM Listing l JOIN Item i ON l\.item_id = i\.item_id WHERE l\.seller_id =/i.test(cleanSql)) {
+    const seller_id = Number(params[0]);
+    const rows = listings.filter(l => l.seller_id === seller_id).map(l => {
+      const item = items.find(i => i.item_id === l.item_id);
+      return {
+        listing_id: l.listing_id,
+        item_name: item ? item.item_name : 'Item',
+        brand: item ? item.brand : '',
+        mrp: Number(l.mrp),
+        selling_price: Number(l.selling_price),
+        quantity_available: Number(l.quantity_available),
+        description: l.description,
+        photo_url: l.photo_url,
+        listing_status: l.listing_status,
+        created_at: l.created_at
+      };
+    }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    return [rows];
+  }
+
+  // 14. Create Listing
+  if (/INSERT INTO Listing/i.test(cleanSql)) {
+    const [seller_id, item_id, mrp, selling_price, quantity_available, description, photo_url, room_number] = params;
+
+    // Trigger check: active listing for same item
+    const duplicate = listings.find(l => l.seller_id === Number(seller_id) && l.item_id === Number(item_id) && l.listing_status === 'Active');
+    if (duplicate) {
+      const err = new Error('ERROR: You already have an Active listing for this item.');
+      err.sqlState = '45000';
+      throw err;
+    }
+
+    const newListing = {
+      listing_id: nextListingId++,
+      seller_id: Number(seller_id),
+      item_id: Number(item_id),
+      mrp: Number(mrp),
+      selling_price: Number(selling_price),
+      quantity_available: Number(quantity_available),
+      description: description || '',
+      photo_url: photo_url || '',
+      room_number: room_number || '101',
+      listing_status: 'Active',
+      created_at: new Date()
+    };
+    listings.unshift(newListing);
+    return [{ insertId: newListing.listing_id, affectedRows: 1 }];
+  }
+
+  // 15. Check Listing seller before deletion / remove
+  if (/SELECT seller_id FROM Listing WHERE listing_id =/i.test(cleanSql)) {
+    const listing_id = Number(params[0]);
+    const l = listings.find(lst => lst.listing_id === listing_id);
+    return [l ? [{ seller_id: l.seller_id }] : []];
+  }
+
+  // 16. Remove Listing
+  if (/UPDATE Listing SET listing_status = 'Removed' WHERE listing_id =/i.test(cleanSql)) {
+    const listing_id = Number(params[0]);
+    const l = listings.find(lst => lst.listing_id === listing_id);
+    if (l) l.listing_status = 'Removed';
+    return [{ affectedRows: 1 }];
+  }
+
+  // 17. Orders: My Orders (Buyer)
+  if (/FROM `Order` o JOIN Order_Item oi .* WHERE o\.buyer_id =/i.test(cleanSql)) {
+    const buyer_id = Number(params[0]);
+    const userOrders = orders.filter(o => o.buyer_id === buyer_id);
+    const rows = userOrders.map(o => {
+      const oi = order_items.find(item => item.order_id === o.order_id);
+      const l = oi ? listings.find(lst => lst.listing_id === oi.listing_id) : null;
+      const item = l ? items.find(it => it.item_id === l.item_id) : null;
+      const seller = l ? students.find(s => s.student_id === l.seller_id) : null;
+      return {
+        order_id: o.order_id,
+        item_name: item ? item.item_name : 'Item',
+        quantity: oi ? oi.quantity : 1,
+        price_at_purchase: oi ? Number(oi.price_at_purchase) : 0,
+        total_amount: Number(o.total_amount),
+        order_status: o.order_status,
+        created_at: o.created_at,
+        seller_name: seller ? seller.name : 'Seller',
+        seller_phone: seller ? seller.phone_no : '',
+        seller_id: seller ? seller.student_id : null
+      };
+    }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    return [rows];
+  }
+
+  // 18. Orders: Selling Orders (Seller)
+  if (/FROM `Order` o JOIN Order_Item oi .* WHERE l\.seller_id =/i.test(cleanSql)) {
+    const seller_id = Number(params[0]);
+    const rows = [];
+    orders.forEach(o => {
+      const oi = order_items.find(item => item.order_id === o.order_id);
+      const l = oi ? listings.find(lst => lst.listing_id === oi.listing_id) : null;
+      if (l && l.seller_id === seller_id) {
+        const item = items.find(it => it.item_id === l.item_id);
+        const buyer = students.find(s => s.student_id === o.buyer_id);
+        rows.push({
+          order_id: o.order_id,
+          item_name: item ? item.item_name : 'Item',
+          quantity: oi.quantity,
+          price_at_purchase: Number(oi.price_at_purchase),
+          total_amount: Number(o.total_amount),
+          order_status: o.order_status,
+          created_at: o.created_at,
+          buyer_name: buyer ? buyer.name : 'Buyer',
+          buyer_phone: buyer ? buyer.phone_no : '',
+          buyer_id: buyer ? buyer.student_id : null
+        });
+      }
+    });
+    rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    return [rows];
+  }
+
+  // 19. Cancel Order
+  if (/SELECT buyer_id, order_status FROM `Order` WHERE order_id =/i.test(cleanSql)) {
+    const order_id = Number(params[0]);
+    const o = orders.find(ord => ord.order_id === order_id);
+    return [o ? [{ buyer_id: o.buyer_id, order_status: o.order_status }] : []];
+  }
+
+  if (/UPDATE `Order` SET order_status = 'Cancelled' WHERE order_id =/i.test(cleanSql)) {
+    const order_id = Number(params[0]);
+    const o = orders.find(ord => ord.order_id === order_id);
+    if (o) {
+      o.order_status = 'Cancelled';
+      // Restore stock
+      const oi = order_items.find(item => item.order_id === order_id);
+      if (oi) {
+        const l = listings.find(lst => lst.listing_id === oi.listing_id);
+        if (l) {
+          l.quantity_available += oi.quantity;
+          l.listing_status = 'Active';
+        }
+      }
+    }
+    return [{ affectedRows: 1 }];
+  }
+
+  // 20. Confirm & Deliver Orders
+  if (/SELECT o\.order_id FROM `Order` o JOIN Order_Item oi .* WHERE o\.order_id = \? AND l\.seller_id = \?/i.test(cleanSql)) {
+    const order_id = Number(params[0]);
+    const seller_id = Number(params[1]);
+    const oi = order_items.find(item => item.order_id === order_id);
+    const l = oi ? listings.find(lst => lst.listing_id === oi.listing_id) : null;
+    if (l && l.seller_id === seller_id) {
+      return [[{ order_id }]];
+    }
+    return [[]];
+  }
+
+  if (/UPDATE `Order` SET order_status = 'Confirmed' WHERE order_id =/i.test(cleanSql)) {
+    const order_id = Number(params[0]);
+    const o = orders.find(ord => ord.order_id === order_id);
+    if (o) o.order_status = 'Confirmed';
+    return [{ affectedRows: 1 }];
+  }
+
+  if (/UPDATE `Order` SET order_status = 'Delivered' WHERE order_id =/i.test(cleanSql)) {
+    const order_id = Number(params[0]);
+    const o = orders.find(ord => ord.order_id === order_id);
+    if (o) o.order_status = 'Delivered';
+    return [{ affectedRows: 1 }];
+  }
+
+  // 21. Messages: Unread count
+  if (/SELECT COUNT\(\*\) AS unread_count FROM Message m/i.test(cleanSql)) {
+    const receiver_id = Number(params[0]);
+    const count = messages.filter(m => {
+      if (m.receiver_id !== receiver_id || m.is_read) return false;
+      const o = orders.find(ord => ord.order_id === m.order_id);
+      return o && ['Placed', 'Confirmed'].includes(o.order_status);
+    }).length;
+    return [[{ unread_count: count }]];
+  }
+
+  // 22. Messages: Mark as read
+  if (/UPDATE Message SET is_read = TRUE/i.test(cleanSql)) {
+    const order_id = Number(params[0]);
+    const receiver_id = Number(params[1]);
+    messages.forEach(m => {
+      if (m.order_id === order_id && m.receiver_id === receiver_id) {
+        m.is_read = true;
+      }
+    });
+    return [{ affectedRows: 1 }];
+  }
+
+  // 23. Messages: Check order participants
+  if (/SELECT o\.buyer_id, l\.seller_id, o\.order_status FROM `Order` o/i.test(cleanSql)) {
+    const order_id = Number(params[0]);
+    const o = orders.find(ord => ord.order_id === order_id);
+    if (!o) return [[]];
+    const oi = order_items.find(item => item.order_id === order_id);
+    const l = oi ? listings.find(lst => lst.listing_id === oi.listing_id) : null;
+    return [[{
+      buyer_id: o.buyer_id,
+      seller_id: l ? l.seller_id : null,
+      order_status: o.order_status
+    }]];
+  }
+
+  // 24. Messages: Get all for order
+  if (/SELECT m\.message_id, m\.sender_id, s\.name AS sender_name/i.test(cleanSql)) {
+    const order_id = Number(params[0]);
+    const orderMsgs = messages.filter(m => m.order_id === order_id).map(m => {
+      const sender = students.find(s => s.student_id === m.sender_id);
+      return {
+        message_id: m.message_id,
+        sender_id: m.sender_id,
+        sender_name: sender ? sender.name : 'User',
+        message_text: m.message_text,
+        sent_at: m.sent_at
+      };
+    }).sort((a, b) => new Date(a.sent_at) - new Date(b.sent_at));
+    return [orderMsgs];
+  }
+
+  // 25. Messages: Send message
+  if (/INSERT INTO Message/i.test(cleanSql)) {
+    const [order_id, sender_id, receiver_id, message_text] = params;
+    const newMsg = {
+      message_id: nextMessageId++,
+      order_id: Number(order_id),
+      sender_id: Number(sender_id),
+      receiver_id: Number(receiver_id),
+      message_text,
+      is_read: false,
+      sent_at: new Date()
+    };
+    messages.push(newMsg);
+    return [{ insertId: newMsg.message_id, affectedRows: 1 }];
+  }
+
+  // 26. Reports: Insert report
+  if (/INSERT INTO Report/i.test(cleanSql)) {
+    const [order_id, reporter_id, reported_user_id, reason, proof_url] = params;
+    reports.push({
+      report_id: nextReportId++,
+      order_id: Number(order_id),
+      reporter_id: Number(reporter_id),
+      reported_user_id: Number(reported_user_id),
+      reason,
+      proof_url,
+      created_at: new Date()
+    });
+    return [{ affectedRows: 1 }];
+  }
+
+  console.warn('Unhandled SQL query:', cleanSql, params);
+  return [[]];
+};
+
+module.exports = {
+  query,
+  getConnection: (cb) => {
+    if (cb) cb(null, { release: () => {} });
+  }
+};

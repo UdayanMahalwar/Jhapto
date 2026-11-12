@@ -1,4 +1,5 @@
 const mysql = require('mysql2/promise');
+require('dotenv').config();
 
 const itemsToAdd = [
   // Chips
@@ -37,10 +38,11 @@ const itemsToAdd = [
 async function insertItems() {
   try {
     const connection = await mysql.createConnection({
-      host: 'localhost',
-      user: 'root',
-      password: 'Vedshasha1!',
-      database: 'jhapto'
+      host: process.env.DB_HOST,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+      port: process.env.DB_PORT
     });
 
     const query = 'INSERT INTO Item (item_name, brand, category_id) VALUES ?';
