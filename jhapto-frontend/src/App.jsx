@@ -8,6 +8,7 @@ import MyOrdersPage from './pages/MyOrdersPage';
 import SellerDashboard from './pages/SellerDashboard';
 import ChatPage from './pages/ChatPage';
 import AdminDashboard from './pages/AdminDashboard';
+import ProfilePage from './pages/ProfilePage';
 import './App.css';
 
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
@@ -36,6 +37,7 @@ function AppRoutes() {
         <Route path="/orders" element={<ProtectedRoute><MyOrdersPage /></ProtectedRoute>} />
         <Route path="/seller" element={<ProtectedRoute><SellerDashboard /></ProtectedRoute>} />
         <Route path="/chat/:order_id" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
         
         {/* Protected Admin Routes */}
         <Route path="/admin/dashboard" element={<ProtectedRoute requireAdmin={true}><AdminDashboard /></ProtectedRoute>} />

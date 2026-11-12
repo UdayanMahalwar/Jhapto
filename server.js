@@ -18,8 +18,8 @@ const PORT = 3000;
 
 // ── Middleware ───────────────────────────────────────────────
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // ── API Routes ───────────────────────────────────────────────
 const authRoutes = require('./jhapto-backend/routes/auth.js');
@@ -28,6 +28,8 @@ const ordersRoutes = require('./jhapto-backend/routes/orders.js');
 const messagesRoutes = require('./jhapto-backend/routes/messages.js');
 const adminRoutes = require('./jhapto-backend/routes/admin.js');
 const reportsRoutes = require('./jhapto-backend/routes/reports.js');
+const reviewsRoutes = require('./jhapto-backend/routes/reviews.js');
+const notificationsRoutes = require('./jhapto-backend/routes/notifications.js');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/listings', listingsRoutes);
@@ -35,6 +37,8 @@ app.use('/api/orders', ordersRoutes);
 app.use('/api/messages', messagesRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/reviews', reviewsRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Jhapto Server is running!' });

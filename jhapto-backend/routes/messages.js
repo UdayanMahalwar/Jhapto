@@ -99,8 +99,11 @@ router.post('/:order_id', auth, async (req, res) => {
   const sender_id  = req.user.student_id;
   const { message_text } = req.body;
 
-  if (!message_text || message_text.trim() === '') {
+  if (typeof message_text !== 'string' || message_text.trim() === '') {
     return res.status(400).json({ message: 'Message cannot be empty.' });
+  }
+  if (message_text.trim().length > 1000) {
+    return res.status(400).json({ message: 'Message can be at most 1000 characters.' });
   }
 
   try {

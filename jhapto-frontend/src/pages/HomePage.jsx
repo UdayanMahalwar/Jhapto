@@ -91,17 +91,16 @@ const HomePage = () => {
 
   const handleCheckout = async () => {
     try {
-      for (const item of cartItems) {
-        await api.post('/orders', {
-          listing_id: item.listing_id,
-          quantity: item.quantity
-        });
-      }
-      showNotification('Order(s) placed successfully!');
+      // One request, one database transaction: all items are ordered or none are
+      const res = await api.post('/orders/checkout', {
+        items: cartItems.map(item => ({ listing_id: item.listing_id, quantity: item.quantity }))
+      });
+      showNotification(res.data.message || 'Order(s) placed successfully!');
       setCartItems([]);
       setTimeout(() => navigate('/orders'), 1500);
     } catch (err) {
       showNotification(err.response?.data?.message || 'Error placing order', 'error');
+      fetchProducts(); // stock may have changed — refresh what's available
     }
   };
 
@@ -149,7 +148,7 @@ const HomePage = () => {
         
         <div className="products-section">
           <div className="section-header">
-            <h3 className="section-title">{selectedCategory ? `${selectedCategory} near you` : `Trending on Floor ${user?.floor_id}`}</h3>
+            <h3 className="section-title">{selectedCategory ? `${selectedCategory} near you` : `Trending on Floor ${user?.floor_number ?? user?.floor_id}`}</h3>
             <button className="view-all-btn" onClick={() => setSelectedCategory(null)}>View All</button>
           </div>
           
@@ -169,6 +168,7 @@ const HomePage = () => {
                     onAdd={handleAddToCart}
                     onRemove={handleRemoveFromCart}
                     cartQuantity={cartItem ? cartItem.quantity : 0}
+                    isOwn={Number(product.seller_id) === Number(user?.student_id)}
                   />
                 );
               })
