@@ -5,9 +5,6 @@ import StarRating from '../components/StarRating';
 import { AuthContext } from '../contexts/AuthContext';
 import api from '../utils/api';
 
-const fieldStyle = { padding: '0.8rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' };
-const labelStyle = { display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.85rem', color: 'var(--text-secondary)' };
-const okStyle = { marginBottom: '1rem', padding: '0.75rem 1rem', borderRadius: '8px', background: 'rgba(46, 204, 113, 0.15)', color: '#2ecc71', border: '1px solid #2ecc71' };
 
 const ProfilePage = () => {
   const { user, logout, updateUser } = useContext(AuthContext);
@@ -77,66 +74,71 @@ const ProfilePage = () => {
 
   return (
     <>
-      <Header cartCount={0} user={user} onLogout={logout} onOrdersClick={() => navigate('/orders')} onSellerClick={() => navigate('/seller')} />
-      <div style={{ padding: '2rem 1rem', maxWidth: '1000px', margin: '0 auto' }}>
-        <h2 className="text-gradient" style={{ marginBottom: '1.5rem' }}>My Profile</h2>
+      <Header user={user} onLogout={logout} onOrdersClick={() => navigate('/orders')} onSellerClick={() => navigate('/seller')} />
+      <main className="page">
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">My Profile</h1>
+            <p className="page-subtitle">Your details, password and seller rating.</p>
+          </div>
+        </div>
 
         {!profile ? (
-          <p style={{ opacity: 0.7 }}>Loading…</p>
+          <p className="muted">Loading…</p>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-            <div className="glass-panel" style={{ padding: '1.5rem' }}>
-              <h3 style={{ marginBottom: '1rem' }}>Details</h3>
+          <div className="profile-grid">
+            <div className="card card-lg">
+              <h2 className="section-heading">Details</h2>
               {profileMsg.text && (
-                <div className={profileMsg.type === 'error' ? 'auth-error' : undefined} style={profileMsg.type === 'error' ? { marginBottom: '1rem' } : okStyle}>{profileMsg.text}</div>
+                <div className={`alert ${profileMsg.type === 'error' ? 'alert-error' : 'alert-success'}`} role="status" style={{ marginBottom: '1rem' }}>{profileMsg.text}</div>
               )}
               <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <label style={labelStyle}>
-                  Email (can't be changed)
-                  <input type="email" value={profile.email} disabled style={{ ...fieldStyle, opacity: 0.6 }} />
+                <label className="field">
+                  <span>Email (can't be changed)</span>
+                  <input type="email" value={profile.email} disabled className="input" />
                 </label>
-                <label style={labelStyle}>
-                  Name
-                  <input type="text" required maxLength={100} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} style={fieldStyle} />
+                <label className="field">
+                  <span>Name</span>
+                  <input type="text" required maxLength={100} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input" />
                 </label>
-                <label style={labelStyle}>
-                  Phone number
-                  <input type="tel" required pattern="[6-9][0-9]{9}" title="10-digit mobile number" maxLength={10} value={form.phone_no} onChange={(e) => setForm({ ...form, phone_no: e.target.value })} style={fieldStyle} />
+                <label className="field">
+                  <span>Phone number</span>
+                  <input type="tel" required pattern="[6-9][0-9]{9}" title="10-digit mobile number" maxLength={10} value={form.phone_no} onChange={(e) => setForm({ ...form, phone_no: e.target.value })} className="input" />
                 </label>
-                <label style={labelStyle}>
-                  Floor ({profile.hostel_name})
-                  <select value={form.floor_id} onChange={(e) => setForm({ ...form, floor_id: e.target.value })} style={fieldStyle}>
+                <label className="field">
+                  <span>Floor ({profile.hostel_name})</span>
+                  <select value={form.floor_id} onChange={(e) => setForm({ ...form, floor_id: e.target.value })} className="input">
                     {floors.map(f => <option key={f.floor_id} value={f.floor_id}>Floor {f.floor_number}</option>)}
                   </select>
                 </label>
-                <button type="submit" className="auth-btn" style={{ marginTop: 0 }}>Save details</button>
+                <button type="submit" className="btn btn-primary">Save details</button>
               </form>
             </div>
 
-            <div className="glass-panel" style={{ padding: '1.5rem' }}>
-              <h3 style={{ marginBottom: '1rem' }}>Change password</h3>
+            <div className="card card-lg">
+              <h2 className="section-heading">Change password</h2>
               {pwMsg.text && (
-                <div className={pwMsg.type === 'error' ? 'auth-error' : undefined} style={pwMsg.type === 'error' ? { marginBottom: '1rem' } : okStyle}>{pwMsg.text}</div>
+                <div className={`alert ${pwMsg.type === 'error' ? 'alert-error' : 'alert-success'}`} role="status" style={{ marginBottom: '1rem' }}>{pwMsg.text}</div>
               )}
               <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <label style={labelStyle}>
-                  Current password
-                  <input type="password" required autoComplete="current-password" value={pw.current_password} onChange={(e) => setPw({ ...pw, current_password: e.target.value })} style={fieldStyle} />
+                <label className="field">
+                  <span>Current password</span>
+                  <input type="password" required autoComplete="current-password" value={pw.current_password} onChange={(e) => setPw({ ...pw, current_password: e.target.value })} className="input" />
                 </label>
-                <label style={labelStyle}>
-                  New password (min 6 characters)
-                  <input type="password" required minLength={6} autoComplete="new-password" value={pw.new_password} onChange={(e) => setPw({ ...pw, new_password: e.target.value })} style={fieldStyle} />
+                <label className="field">
+                  <span>New password (min 6 characters)</span>
+                  <input type="password" required minLength={6} autoComplete="new-password" value={pw.new_password} onChange={(e) => setPw({ ...pw, new_password: e.target.value })} className="input" />
                 </label>
-                <label style={labelStyle}>
-                  Confirm new password
-                  <input type="password" required minLength={6} autoComplete="new-password" value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} style={fieldStyle} />
+                <label className="field">
+                  <span>Confirm new password</span>
+                  <input type="password" required minLength={6} autoComplete="new-password" value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} className="input" />
                 </label>
-                <button type="submit" className="auth-btn" style={{ marginTop: 0 }}>Change password</button>
+                <button type="submit" className="btn btn-secondary">Change password</button>
               </form>
             </div>
 
-            <div className="glass-panel" style={{ padding: '1.5rem', gridColumn: '1 / -1' }}>
-              <h3 style={{ marginBottom: '0.5rem' }}>My seller rating</h3>
+            <div className="card card-lg" style={{ gridColumn: '1 / -1' }}>
+              <h2 className="section-heading" style={{ marginBottom: '0.5rem' }}>My seller rating</h2>
               <div style={{ marginBottom: '1rem' }}>
                 <StarRating value={profile.avg_rating || 0} count={profile.rating_count} size={20} />
               </div>
@@ -160,7 +162,7 @@ const ProfilePage = () => {
             </div>
           </div>
         )}
-      </div>
+      </main>
     </>
   );
 };

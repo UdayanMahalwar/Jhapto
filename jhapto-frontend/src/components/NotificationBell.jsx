@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, MessageCircle } from 'lucide-react';
 import api from '../utils/api';
+import { getSocket } from '../utils/socket';
 
-const POLL_MS = 15000;
+const POLL_MS = 60000;   // fallback only — updates are pushed over Socket.IO
 
 const timeAgo = (date) => {
   const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
@@ -19,6 +20,7 @@ const NotificationBell = () => {
   const [notifications, setNotifications] = useState([]);
   const [unread, setUnread] = useState(0);
   const [unreadChats, setUnreadChats] = useState(0);
+  const [chats, setChats] = useState([]);   // [{ order_id, unread_count, from_name, item_name }]
   const wrapperRef = useRef(null);
   const navigate = useNavigate();
 
@@ -28,6 +30,7 @@ const NotificationBell = () => {
       setNotifications(n.data.notifications);
       setUnread(n.data.unread_count);
       setUnreadChats(Number(m.data.unread_count) || 0);
+      setChats(Array.isArray(m.data.chats) ? m.data.chats : []);
     } catch {
       // ignore polling errors (auth errors are handled by the api client)
     }
@@ -36,7 +39,14 @@ const NotificationBell = () => {
   useEffect(() => {
     load();
     const interval = setInterval(load, POLL_MS);
-    return () => clearInterval(interval);
+    const socket = getSocket();
+    socket.on('notifications:changed', load);
+    socket.on('connect', load);          // catch up after a reconnect
+    return () => {
+      clearInterval(interval);
+      socket.off('notifications:changed', load);
+      socket.off('connect', load);
+    };
   }, []);
 
   // Close when clicking outside or pressing Escape
@@ -102,15 +112,19 @@ const NotificationBell = () => {
             )}
           </div>
 
-          {unreadChats > 0 && (
+          {chats.map(c => (
             <button
-              onClick={() => { setOpen(false); navigate('/orders'); }}
+              key={`chat-${c.order_id}`}
+              onClick={() => { setOpen(false); navigate(`/chat/${c.order_id}`); }}
               style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', width: '100%', textAlign: 'left', padding: '0.6rem', borderRadius: '8px', border: 'none', cursor: 'pointer', background: 'rgba(69, 243, 255, 0.08)', color: 'white', marginBottom: '0.25rem' }}
             >
-              <MessageCircle size={16} color="var(--primary-color)" />
-              <span style={{ fontSize: '0.85rem' }}>{unreadChats} unread chat message{unreadChats > 1 ? 's' : ''}</span>
+              <MessageCircle size={16} color="var(--primary-color)" style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: '0.85rem', lineHeight: 1.35 }}>
+                <strong>{c.unread_count} new message{c.unread_count > 1 ? 's' : ''}</strong> from {c.from_name}
+                <span style={{ color: 'var(--text-secondary)' }}> · Order #{c.order_id} ({c.item_name})</span>
+              </span>
             </button>
-          )}
+          ))}
 
           {notifications.length === 0 && unreadChats === 0 && (
             <p style={{ padding: '0.75rem 0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>You're all caught up.</p>

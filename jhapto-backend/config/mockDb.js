@@ -38,23 +38,26 @@ const students = [
   { student_id: 5, name: 'Karan Singh', email: 'karan@tiet.ac.in', phone_no: '9876543214', password_hash: defaultPasswordHash, hostel_id: 1, floor_id: 4, is_banned: false, created_at: new Date('2026-01-02T14:00:00Z') }
 ];
 
+// Same categories as jhapto_migrations_v3.sql
 const categories = [
   { category_id: 1, category_name: 'Snacks & Food' },
-  { category_id: 2, category_name: 'Beverages' },
-  { category_id: 3, category_name: 'Stationery & Books' },
-  { category_id: 4, category_name: 'Electronics & Accessories' },
-  { category_id: 5, category_name: 'Personal Care' }
+  { category_id: 2, category_name: 'Noodles & Instant Food' },
+  { category_id: 3, category_name: 'Beverages' },
+  { category_id: 4, category_name: 'Chocolates & Sweets' },
+  { category_id: 5, category_name: 'Stationery & Books' },
+  { category_id: 6, category_name: 'Personal Care' },
+  { category_id: 7, category_name: 'Electronics & Accessories' }
 ];
 
 const items = [
   { item_id: 1, item_name: 'Lays Classic Salted', brand: 'Lays', category_id: 1 },
-  { item_id: 2, item_name: 'Maggi Noodles 2-min', brand: 'Maggi', category_id: 1 },
-  { item_id: 3, item_name: 'Dark Fantasy Choco Fills', brand: 'Sunfeast', category_id: 1 },
-  { item_id: 4, item_name: 'Amul Kool Milk', brand: 'Amul', category_id: 2 },
+  { item_id: 2, item_name: 'Maggi Noodles 2-min', brand: 'Maggi', category_id: 2 },
+  { item_id: 3, item_name: 'Dark Fantasy Choco Fills', brand: 'Sunfeast', category_id: 4 },
+  { item_id: 4, item_name: 'Amul Kool Milk', brand: 'Amul', category_id: 3 },
   { item_id: 5, item_name: 'Kurkure Masala Munch', brand: 'Kurkure', category_id: 1 },
-  { item_id: 6, item_name: 'Classmate Spiral Notebook', brand: 'Classmate', category_id: 3 },
-  { item_id: 7, item_name: 'Pilot V5 Hi-Tecpoint Pen', brand: 'Pilot', category_id: 3 },
-  { item_id: 8, item_name: 'USB Type-C Fast Cable', brand: 'boAt', category_id: 4 }
+  { item_id: 6, item_name: 'Classmate Spiral Notebook', brand: 'Classmate', category_id: 5 },
+  { item_id: 7, item_name: 'Pilot V5 Hi-Tecpoint Pen', brand: 'Pilot', category_id: 5 },
+  { item_id: 8, item_name: 'USB Type-C Fast Cable', brand: 'boAt', category_id: 7 }
 ];
 
 const listings = [
@@ -125,9 +128,9 @@ const notifyOrderStatus = (o) => {
   if (o.order_status === 'Confirmed') {
     notify(o.buyer_id, 'order_confirmed', `Order #${o.order_id} (${item_name}) was confirmed. You can now chat with the seller.`, `/chat/${o.order_id}`);
   } else if (o.order_status === 'Delivered') {
-    notify(o.buyer_id, 'order_delivered', `Order #${o.order_id} (${item_name}) was delivered. Rate your seller!`, '/orders');
+    notify(o.buyer_id, 'order_delivered', `Order #${o.order_id} (${item_name}) was delivered. Rate your seller!`, '/orders?tab=history');
   } else if (o.order_status === 'Cancelled' && seller_id) {
-    notify(seller_id, 'order_cancelled', `Order #${o.order_id} (${item_name}) was cancelled by the buyer.`, '/seller');
+    notify(seller_id, 'order_cancelled', `Order #${o.order_id} (${item_name}) was cancelled by the buyer.`, '/seller?tab=history');
   }
 };
 
@@ -181,7 +184,9 @@ const query = async (sql, params = []) => {
       const priority_rank = (seller?.floor_id === buyer_floor_id) ? 0 : 1;
       return {
         listing_id: l.listing_id,
+        item_id: l.item_id,
         item_name: item ? item.item_name : 'Item',
+        category_name: (categories.find(c => item && c.category_id === item.category_id) || {}).category_name || 'Other',
         seller_id: l.seller_id,
         seller_name: seller ? seller.name : 'Unknown',
         seller_rating: sellerRating(l.seller_id).avg_rating,
@@ -204,34 +209,31 @@ const query = async (sql, params = []) => {
     return [[result]];
   }
 
-  // 2. CALL sp_admin_report()
+  // 2. CALL sp_admin_report() — earned = Delivered, pending = Placed/Confirmed; banned students included
   if (/CALL sp_admin_report/i.test(cleanSql)) {
-    const reportRows = students.filter(s => !s.is_banned).map(s => {
-      const floor = floors.find(f => f.floor_id === s.floor_id);
-      const total_listings = listings.filter(l => l.seller_id === s.student_id).length;
-      const total_orders = orders.filter(o => o.buyer_id === s.student_id && o.order_status !== 'Cancelled').length;
-
-      // revenue earned as seller
-      let total_revenue = 0;
-      orders.filter(o => o.order_status !== 'Cancelled').forEach(o => {
-        const itemRows = order_items.filter(oi => oi.order_id === o.order_id);
-        itemRows.forEach(oi => {
+    const sellerTotal = (student_id, statuses) => {
+      let sum = 0;
+      orders.filter(o => statuses.includes(o.order_status)).forEach(o => {
+        order_items.filter(oi => oi.order_id === o.order_id).forEach(oi => {
           const l = listings.find(lst => lst.listing_id === oi.listing_id);
-          if (l && l.seller_id === s.student_id) {
-            total_revenue += (Number(oi.price_at_purchase) * Number(oi.quantity));
-          }
+          if (l && l.seller_id === student_id) sum += Number(oi.price_at_purchase) * Number(oi.quantity);
         });
       });
-
+      return Number(sum.toFixed(2));
+    };
+    const reportRows = students.map(s => {
+      const floor = floors.find(f => f.floor_id === s.floor_id);
       return {
         student_id: s.student_id,
         student_name: s.name,
         floor_number: floor ? floor.floor_number : 1,
-        total_listings,
-        total_orders,
-        total_revenue: Number(total_revenue.toFixed(2))
+        is_banned: s.is_banned ? 1 : 0,
+        total_listings: listings.filter(l => l.seller_id === s.student_id && l.listing_status !== 'Removed').length,
+        total_orders: orders.filter(o => o.buyer_id === s.student_id && o.order_status !== 'Cancelled').length,
+        total_revenue: sellerTotal(s.student_id, ['Delivered']),
+        pending_revenue: sellerTotal(s.student_id, ['Placed', 'Confirmed']),
       };
-    }).sort((a, b) => b.total_revenue - a.total_revenue);
+    }).sort((a, b) => b.total_revenue - a.total_revenue || b.pending_revenue - a.pending_revenue);
 
     return [[reportRows]];
   }
@@ -601,40 +603,54 @@ const query = async (sql, params = []) => {
     return [{ affectedRows: 1 }];
   }
 
-  // 21. Messages: Unread count
-  if (/SELECT COUNT\(\*\) AS unread_count FROM Message m/i.test(cleanSql)) {
+  // 21. Messages: unread count per chat
+  if (/SELECT m\.order_id, COUNT\(\*\) AS unread_count/i.test(cleanSql)) {
     const receiver_id = Number(params[0]);
-    const count = messages.filter(m => {
-      if (m.receiver_id !== receiver_id || m.is_read) return false;
+    const byOrder = new Map();
+    messages.forEach(m => {
+      if (m.receiver_id !== receiver_id || m.is_read) return;
       const o = orders.find(ord => ord.order_id === m.order_id);
-      return o && ['Placed', 'Confirmed'].includes(o.order_status);
-    }).length;
-    return [[{ unread_count: count }]];
+      if (!o || !['Placed', 'Confirmed'].includes(o.order_status)) return;
+      const entry = byOrder.get(m.order_id) || { order_id: m.order_id, unread_count: 0, last: 0 };
+      entry.unread_count++;
+      entry.last = Math.max(entry.last, new Date(m.sent_at).getTime());
+      entry.from_name = (students.find(st => st.student_id === m.sender_id) || {}).name;
+      entry.item_name = orderInfo(m.order_id).item_name;
+      byOrder.set(m.order_id, entry);
+    });
+    return [[...byOrder.values()].sort((a, b) => b.last - a.last).map(({ last, ...rest }) => rest)];
   }
 
   // 22. Messages: Mark as read
   if (/UPDATE Message SET is_read = TRUE/i.test(cleanSql)) {
     const order_id = Number(params[0]);
     const receiver_id = Number(params[1]);
+    let changed = 0;
     messages.forEach(m => {
-      if (m.order_id === order_id && m.receiver_id === receiver_id) {
+      if (m.order_id === order_id && m.receiver_id === receiver_id && !m.is_read) {
         m.is_read = true;
+        changed++;
       }
     });
-    return [{ affectedRows: 1 }];
+    return [{ affectedRows: changed }];
   }
 
   // 23. Messages: Check order participants
-  if (/SELECT o\.buyer_id, l\.seller_id, o\.order_status FROM `Order` o/i.test(cleanSql)) {
+  if (/SELECT o\.buyer_id, l\.seller_id, o\.order_status(, oi\.quantity, i\.item_name.*)? FROM `Order` o/i.test(cleanSql)) {
     const order_id = Number(params[0]);
     const o = orders.find(ord => ord.order_id === order_id);
     if (!o) return [[]];
     const oi = order_items.find(item => item.order_id === order_id);
     const l = oi ? listings.find(lst => lst.listing_id === oi.listing_id) : null;
+    const name = (id) => (students.find(st => st.student_id === id) || {}).name;
     return [[{
       buyer_id: o.buyer_id,
       seller_id: l ? l.seller_id : null,
-      order_status: o.order_status
+      order_status: o.order_status,
+      quantity: oi ? oi.quantity : 1,
+      item_name: orderInfo(order_id).item_name,
+      buyer_name: name(o.buyer_id),
+      seller_name: l ? name(l.seller_id) : null,
     }]];
   }
 
@@ -785,9 +801,13 @@ const query = async (sql, params = []) => {
 
   // ── Added with ratings / notifications / profile / listing edit ─────────
   // Student login (joins Floor for floor_number)
-  if (/FROM Student s JOIN Floor f ON s\.floor_id = f\.floor_id WHERE s\.email = \?/i.test(cleanSql)) {
+  if (/FROM Student s JOIN Floor f ON s\.floor_id = f\.floor_id JOIN Hostel h ON s\.hostel_id = h\.hostel_id WHERE s\.email = \?/i.test(cleanSql)) {
     const found = students.filter(s => s.email.toLowerCase() === String(params[0]).toLowerCase())
-      .map(s => ({ ...s, floor_number: (floors.find(f => f.floor_id === s.floor_id) || {}).floor_number }));
+      .map(s => ({
+        ...s,
+        floor_number: (floors.find(f => f.floor_id === s.floor_id) || {}).floor_number,
+        hostel_name: (hostels.find(h => h.hostel_id === s.hostel_id) || {}).hostel_name,
+      }));
     return [found];
   }
 
@@ -926,6 +946,10 @@ const query = async (sql, params = []) => {
     return [{ affectedRows: n ? 1 : 0 }];
   }
 
+  if (/SELECT category_id, category_name FROM Category/i.test(cleanSql)) {
+    return [categories.map(c => ({ ...c }))];
+  }
+
   console.warn('Unhandled SQL query:', cleanSql, params);
   return [[]];
 };
@@ -934,6 +958,7 @@ module.exports = {
   query,
   // Mirrors mysql2 pool.promise().getConnection(). Note: the mock has no real
   // transactions — rollback() does not undo writes made earlier in a checkout.
+  end: async () => {},
   getConnection: async () => ({
     query,
     beginTransaction: async () => {},

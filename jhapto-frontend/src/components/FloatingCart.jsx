@@ -2,28 +2,27 @@ import React from 'react';
 import { ShoppingBag, ArrowRight } from 'lucide-react';
 import './FloatingCart.css';
 
-const FloatingCart = ({ cartItems, onCheckout }) => {
-  if (cartItems.length === 0) return null;
-
-  const itemCount = cartItems.reduce((total, item) => total + item.quantity, 0);
-  const totalAmount = cartItems.reduce((total, item) => total + (item.selling_price * item.quantity), 0);
+// Bottom cart bar on the home page. Click the summary to review the cart.
+const FloatingCart = ({ count, total, placing, onCheckout, onView }) => {
+  if (count === 0) return null;
 
   return (
     <div className="floating-cart-wrapper">
       <div className="floating-cart glass-panel">
-        <div className="cart-info">
+        <button type="button" className="cart-info" onClick={onView} aria-label="Review cart"
+          style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
           <div className="cart-icon-wrapper">
             <ShoppingBag size={24} />
-            <span className="item-count">{itemCount}</span>
+            <span className="item-count">{count}</span>
           </div>
           <div className="cart-text">
-            <span className="cart-label">Items in Cart</span>
-            <span className="cart-total">₹{totalAmount.toFixed(2)}</span>
+            <span className="cart-label">Items in Cart · View</span>
+            <span className="cart-total">₹{total.toFixed(2)}</span>
           </div>
-        </div>
-        
-        <button className="checkout-btn" onClick={onCheckout}>
-          Checkout <ArrowRight size={18} />
+        </button>
+
+        <button className="checkout-btn" onClick={onCheckout} disabled={placing} style={placing ? { opacity: 0.6, cursor: 'wait' } : undefined}>
+          {placing ? 'Placing…' : <>Checkout <ArrowRight size={18} /></>}
         </button>
       </div>
     </div>

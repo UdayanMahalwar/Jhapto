@@ -5,22 +5,34 @@ const express = require('express');
 const router  = express.Router();
 const db      = require('../config/db');
 const auth    = require('../middleware/auth');
+const realtime = require('../realtime');
 
 // ── GET /api/messages/unread ─────────────────────────────
-// Fetch total count of unread messages for logged in user
+// Unread chat messages for the logged-in student: total + one entry per chat
 router.get('/unread', auth, async (req, res) => {
   const student_id = req.user.student_id;
   try {
-    const [[{ unread_count }]] = await db.query(
-      `SELECT COUNT(*) AS unread_count
+    const [chats] = await db.query(
+      `SELECT m.order_id, COUNT(*) AS unread_count,
+              MAX(sender.name) AS from_name, MAX(i.item_name) AS item_name
        FROM Message m
-       JOIN \`Order\` o ON m.order_id = o.order_id
-       WHERE m.receiver_id = ? 
-         AND m.is_read = FALSE 
-         AND o.order_status IN ('Placed', 'Confirmed')`,
+       JOIN \`Order\`    o      ON m.order_id    = o.order_id
+       JOIN Order_Item oi     ON o.order_id    = oi.order_id
+       JOIN Listing    l      ON oi.listing_id = l.listing_id
+       JOIN Item       i      ON l.item_id     = i.item_id
+       JOIN Student    sender ON m.sender_id   = sender.student_id
+       WHERE m.receiver_id = ?
+         AND m.is_read = FALSE
+         AND o.order_status IN ('Placed', 'Confirmed')
+       GROUP BY m.order_id
+       ORDER BY MAX(m.sent_at) DESC`,
       [student_id]
     );
-    res.json({ unread_count });
+    const normalized = chats.map(c => ({ ...c, unread_count: Number(c.unread_count) }));
+    res.json({
+      unread_count: normalized.reduce((sum, c) => sum + c.unread_count, 0),
+      chats: normalized,
+    });
   } catch (err) {
     res.status(500).json({ message: 'Error fetching unread count.', error: err.message });
   }
@@ -32,11 +44,13 @@ router.patch('/:order_id/read', auth, async (req, res) => {
   const order_id = req.params.order_id;
   const student_id = req.user.student_id;
   try {
-    await db.query(
+    const [result] = await db.query(
       `UPDATE Message SET is_read = TRUE
        WHERE order_id = ? AND receiver_id = ? AND is_read = FALSE`,
       [order_id, student_id]
     );
+    // the reader's unread badge (in every open tab) should drop right away
+    if (result.affectedRows > 0) realtime.emitToUser(student_id, 'notifications:changed');
     res.json({ message: 'Messages marked as read.' });
   } catch (err) {
     res.status(500).json({ message: 'Error marking messages as read.', error: err.message });
@@ -52,10 +66,14 @@ router.get('/:order_id', auth, async (req, res) => {
   try {
     // Verify the requester is the buyer or seller of this order
     const [orderRows] = await db.query(
-      `SELECT o.buyer_id, l.seller_id, o.order_status
+      `SELECT o.buyer_id, l.seller_id, o.order_status, oi.quantity, i.item_name,
+              buyer.name AS buyer_name, seller.name AS seller_name
        FROM \`Order\` o
-       JOIN Order_Item oi ON o.order_id    = oi.order_id
-       JOIN Listing    l  ON oi.listing_id = l.listing_id
+       JOIN Order_Item oi     ON o.order_id    = oi.order_id
+       JOIN Listing    l      ON oi.listing_id = l.listing_id
+       JOIN Item       i      ON l.item_id     = i.item_id
+       JOIN Student    buyer  ON o.buyer_id    = buyer.student_id
+       JOIN Student    seller ON l.seller_id   = seller.student_id
        WHERE o.order_id = ? LIMIT 1`,
       [order_id]
     );
@@ -64,17 +82,18 @@ router.get('/:order_id', auth, async (req, res) => {
       return res.status(404).json({ message: 'Order not found.' });
     }
 
-    const { buyer_id, seller_id, order_status } = orderRows[0];
+    const { buyer_id, seller_id, order_status, quantity, item_name, buyer_name, seller_name } = orderRows[0];
     if (student_id !== buyer_id && student_id !== seller_id) {
       return res.status(403).json({ message: 'Not authorised to view these messages.' });
     }
 
     // Mark messages as read since the user is viewing the chat
-    await db.query(
+    const [readResult] = await db.query(
       `UPDATE Message SET is_read = TRUE
        WHERE order_id = ? AND receiver_id = ? AND is_read = FALSE`,
       [order_id, student_id]
     );
+    if (readResult.affectedRows > 0) realtime.emitToUser(student_id, 'notifications:changed');
 
     const [messages] = await db.query(
       `SELECT m.message_id, m.sender_id, s.name AS sender_name,
@@ -86,7 +105,12 @@ router.get('/:order_id', auth, async (req, res) => {
       [order_id]
     );
 
-    res.json({ order_status, messages });
+    const iAmBuyer = student_id === buyer_id;
+    res.json({
+      order_status,
+      messages,
+      order: { item_name, quantity, role: iAmBuyer ? 'buyer' : 'seller', other_name: iAmBuyer ? seller_name : buyer_name },
+    });
   } catch (err) {
     res.status(500).json({ message: 'Error fetching messages.', error: err.message });
   }
@@ -134,13 +158,25 @@ router.post('/:order_id', auth, async (req, res) => {
     // Receiver is whoever is NOT the sender
     const receiver_id = Number(sender_id) === Number(buyer_id) ? seller_id : buyer_id;
 
-    await db.query(
+    const [result] = await db.query(
       `INSERT INTO Message (order_id, sender_id, receiver_id, message_text)
        VALUES (?, ?, ?, ?)`,
       [order_id, sender_id, receiver_id, message_text.trim()]
     );
 
-    res.status(201).json({ message: 'Message sent!' });
+    const message = {
+      message_id  : result.insertId,
+      order_id    : Number(order_id),
+      sender_id   : Number(sender_id),
+      sender_name : req.user.name,
+      message_text: message_text.trim(),
+      sent_at     : new Date().toISOString(),
+    };
+    // Live delivery to whoever has this chat open, and a badge update for the receiver
+    realtime.emitToOrder(order_id, 'message:new', message);
+    realtime.emitToUser(receiver_id, 'notifications:changed');
+
+    res.status(201).json({ message: 'Message sent!', data: message });
   } catch (err) {
     res.status(500).json({ message: 'Error sending message.', error: err.message });
   }

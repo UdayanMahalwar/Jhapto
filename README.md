@@ -3,57 +3,59 @@
 This repository contains the code for the Jhapto Quick Commerce platform, built for university hostels.
 
 ## What is in this repo
-* **jhapto-database**: SQL script to set up the MySQL database, tables, triggers, and sample data.
-* **jhapto-backend**: Node.js/Express backend server that connects to the MySQL database.
-* **jhapto-frontend**: React (Vite) frontend application.
+* **server.js**: the single entry point. Serves the API, live chat (Socket.IO) and the React frontend on one port.
+* **jhapto-database**: SQL scripts for the MySQL schema, triggers, procedures, sample data and migrations.
+* **jhapto-backend**: Express API (`app.js`, `routes/`), Socket.IO (`realtime.js`), tests (`tests/`) and admin scripts (`scripts/`).
+* **jhapto-frontend**: React (Vite) frontend.
 
 ## How to run locally
 
-### 1. Database (MySQL 8.x)
+### 1. MySQL (8.x)
 ```bash
-brew install mysql@8.4 && brew services start mysql@8.4   # macOS
-mysql -u root < jhapto-database/jhapto_database.sql
-mysql -u root < jhapto-database/jhapto_migrations.sql      # room_number, is_read, Report table, dev logins
-mysql -u root < jhapto-database/jhapto_migrations_v2.sql   # seller ratings/reviews, notifications
-mysql -u root -e "CREATE USER 'jhapto'@'localhost' IDENTIFIED BY 'jhapto_local'; GRANT ALL ON jhapto.* TO 'jhapto'@'localhost';"
-cp jhapto-backend/.env.example jhapto-backend/.env           # then set DB_PASSWORD
+brew install mysql@8.4 && brew services start mysql@8.4      # macOS
+mysql -u root -e "CREATE USER 'jhapto'@'localhost' IDENTIFIED BY 'jhapto_local';
+                  GRANT ALL ON jhapto.* TO 'jhapto'@'localhost';
+                  GRANT ALL ON jhapto_test.* TO 'jhapto'@'localhost';
+                  SET PERSIST log_bin_trust_function_creators = 1;"
+```
+The last line lets a non-root user create the project's triggers and functions.
+
+### 2. App
+```bash
+npm install
+cp jhapto-backend/.env.example jhapto-backend/.env   # set DB_PASSWORD (jhapto_local above)
+npm run db:setup                                     # creates the jhapto database with sample data
+npm run dev                                          # http://localhost:3000
 ```
 Seed logins: any student (e.g. `aarav@tiet.ac.in`) / `password123`, admin `admin@jhapto.com` / `admin123`.
-Set `USE_MOCK_DB=true` in `jhapto-backend/.env` to run without MySQL.
 
-### Quick start (frontend + API on one port)
+`npm run dev` (nodemon, see `nodemon.json`) restarts the server when backend code changes; frontend changes hot-reload in the browser.
+Set `USE_MOCK_DB=true` in `jhapto-backend/.env` to run without MySQL (in-memory data, resets on restart).
+
+### Production
 ```bash
-npm install && (cd jhapto-backend && npm install)
-npm run dev   # http://localhost:3000
+npm run build && npm start
 ```
 
-### 2. Backend Server
-1. Open a terminal and navigate to the backend folder:
-   ```bash
-   cd jhapto/jhapto-backend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Create a `.env` file with your database credentials (check `.env` for variables like `DB_PASSWORD`, `DB_HOST`, etc.).
-4. Start the server:
-   ```bash
-   npm run dev
-   ```
-   (Runs on http://localhost:5001 — port 5000 is taken by AirPlay on macOS)
+## Scripts
 
-### 3. Frontend Application
-1. Open a new terminal and navigate to the frontend folder:
-   ```bash
-   cd jhapto/jhapto-frontend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the React app:
-   ```bash
-   npm run dev
-   ```
-   (Runs on http://localhost:5173)
+| Command | What it does |
+|---|---|
+| `npm run dev` | App on http://localhost:3000 with auto-restart |
+| `npm test` | API + live-chat test suite against a throwaway `jhapto_test` database |
+| `npm run db:setup` | Create the database from `jhapto-database/*.sql` (`-- --reset` drops and rebuilds it) |
+| `npm run images:migrate` | Move old base64 images out of the database into `jhapto-backend/uploads/` (dry run; add `-- --apply`) |
+
+## Updating an existing database
+If your database was created with an older version of this repo, apply the migrations you don't have yet, in order:
+```bash
+mysql -u root jhapto < jhapto-database/jhapto_migrations.sql      # only if it predates room numbers / reports
+mysql -u root jhapto < jhapto-database/jhapto_migrations_v2.sql   # seller ratings, notifications
+mysql -u root jhapto < jhapto-database/jhapto_migrations_v3.sql   # categories + catalogue, delivered-only revenue
+npm run images:migrate -- --apply                                  # if listings/reports have base64 images
+```
+
+## How things work
+* **Images** are uploaded to `POST /api/uploads`, checked by their actual bytes (PNG/JPEG/GIF/WebP, max 5 MB), saved under random names in `jhapto-backend/uploads/` and served from `/uploads/…`. The database stores only the URL.
+* **Live chat**: the chat page joins a Socket.IO room for the order; new messages, order status changes and notification badges are pushed instantly.
+* **Tests** rebuild `jhapto_test` from the real SQL files before each test file, so triggers and procedures are tested too. They refuse to run against a database whose name doesn't end in `_test`.

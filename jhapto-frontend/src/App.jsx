@@ -1,6 +1,8 @@
 import React, { useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './contexts/AuthContext';
+import { CartProvider } from './contexts/CartContext';
+import { ToastProvider } from './contexts/ToastContext';
 import AuthPage from './pages/AuthPage';
 import AdminAuthPage from './pages/AdminAuthPage';
 import HomePage from './pages/HomePage';
@@ -9,6 +11,7 @@ import SellerDashboard from './pages/SellerDashboard';
 import ChatPage from './pages/ChatPage';
 import AdminDashboard from './pages/AdminDashboard';
 import ProfilePage from './pages/ProfilePage';
+import CartPage from './pages/CartPage';
 import './App.css';
 
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
@@ -38,6 +41,7 @@ function AppRoutes() {
         <Route path="/seller" element={<ProtectedRoute><SellerDashboard /></ProtectedRoute>} />
         <Route path="/chat/:order_id" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+        <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
         
         {/* Protected Admin Routes */}
         <Route path="/admin/dashboard" element={<ProtectedRoute requireAdmin={true}><AdminDashboard /></ProtectedRoute>} />
@@ -53,9 +57,13 @@ function AppRoutes() {
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <AppRoutes />
-      </Router>
+      <CartProvider>
+        <ToastProvider>
+          <Router>
+            <AppRoutes />
+          </Router>
+        </ToastProvider>
+      </CartProvider>
     </AuthProvider>
   );
 }

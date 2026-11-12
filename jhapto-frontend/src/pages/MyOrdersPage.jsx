@@ -1,25 +1,29 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { MessageCircle, Package, Star, Flag, X } from 'lucide-react';
 import Header from '../components/Header';
 import { AuthContext } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import api from '../utils/api';
 import OrderFilters from '../components/OrderFilters';
-import StarRating from '../components/StarRating';
+import OrderCard from '../components/OrderCard';
+import Tabs from '../components/Tabs';
+import EmptyState from '../components/EmptyState';
+import ReportDialog from '../components/ReportDialog';
+import RateDialog from '../components/RateDialog';
 import { STATUSES_FOR_TAB, EMPTY_FILTERS, orderFilterParams } from '../utils/orderFilters';
 
 const MyOrdersPage = () => {
   const [orders, setOrders] = useState([]);
-  const [activeTab, setActiveTab] = useState('active'); // 'active' or 'history'
-  const [reportModal, setReportModal] = useState({ show: false, order: null });
-  const [reportReason, setReportReason] = useState('');
-  const [reportProof, setReportProof] = useState('');
+  // Tab lives in the URL (?tab=history) so notifications can link straight to it
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') === 'history' ? 'history' : 'active';
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [loading, setLoading] = useState(true);
-  const [reviewModal, setReviewModal] = useState(null); // order being rated
-  const [reviewRating, setReviewRating] = useState(0);
-  const [reviewComment, setReviewComment] = useState('');
-  const [reviewError, setReviewError] = useState('');
+  const [reporting, setReporting] = useState(null);   // order being reported
+  const [rating, setRating] = useState(null);         // order being rated
   const { user, logout } = useContext(AuthContext);
+  const toast = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -40,190 +44,92 @@ const MyOrdersPage = () => {
   };
 
   const switchTab = (tab) => {
-    setActiveTab(tab);
+    setSearchParams(tab === 'history' ? { tab: 'history' } : {}, { replace: true });
     setFilters(EMPTY_FILTERS);
   };
 
-  const openReview = (order) => {
-    setReviewModal(order);
-    setReviewRating(0);
-    setReviewComment('');
-    setReviewError('');
-  };
-
-  const submitReview = async (e) => {
-    e.preventDefault();
-    if (!reviewRating) return setReviewError('Pick a star rating.');
-    try {
-      await api.post('/reviews', { order_id: reviewModal.order_id, rating: reviewRating, comment: reviewComment });
-      setReviewModal(null);
-      fetchOrders();
-    } catch (err) {
-      setReviewError(err.response?.data?.message || 'Error saving review');
-    }
-  };
-
   const handleCancel = async (order_id) => {
-    if (!window.confirm('Are you sure you want to cancel this order?')) return;
+    if (!window.confirm('Cancel this order? The seller will be notified.')) return;
     try {
       await api.patch(`/orders/${order_id}/cancel`);
-      alert('Order cancelled');
+      toast('Order cancelled');
       fetchOrders();
     } catch (err) {
-      alert(err.response?.data?.message || 'Error cancelling order');
+      toast(err.response?.data?.message || 'Error cancelling order', 'error');
     }
   };
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setReportProof(reader.result);
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const submitReport = async (e) => {
-    e.preventDefault();
-    if (!reportReason) return alert('Reason is required');
-    try {
-      await api.post('/reports', {
-        order_id: reportModal.order.order_id,
-        reported_user_id: reportModal.order.seller_id,
-        reason: reportReason,
-        proof_url: reportProof
-      });
-      alert('Report submitted successfully!');
-      setReportModal({ show: false, order: null });
-      setReportReason('');
-      setReportProof('');
-    } catch (err) {
-      alert(err.response?.data?.message || 'Error submitting report');
-    }
-  };
+  const filtered = filters.status || filters.from || filters.to;
 
   return (
     <>
-      <Header cartCount={0} user={user} onLogout={logout} onOrdersClick={() => navigate('/orders')} onSellerClick={() => navigate('/seller')} />
-      <div className="orders-container" style={{ padding: '2rem', maxWidth: '1000px', margin: '0 auto' }}>
-        <h2 className="text-gradient">My Orders</h2>
-        
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
-          <button 
-            onClick={() => switchTab('active')}
-            className="auth-btn" 
-            style={{ marginTop: 0, padding: '0.8rem 1.5rem', flex: 0, whiteSpace: 'nowrap', background: activeTab === 'active' ? 'var(--primary-color)' : 'rgba(0,0,0,0.3)', color: activeTab === 'active' ? '#000' : 'white', border: activeTab === 'active' ? 'none' : '1px solid var(--border-color)' }}
-          >
-            Active Orders
-          </button>
-          <button 
-            onClick={() => switchTab('history')}
-            className="auth-btn" 
-            style={{ marginTop: 0, padding: '0.8rem 1.5rem', flex: 0, whiteSpace: 'nowrap', background: activeTab === 'history' ? 'var(--primary-color)' : 'rgba(0,0,0,0.3)', color: activeTab === 'history' ? '#000' : 'white', border: activeTab === 'history' ? 'none' : '1px solid var(--border-color)' }}
-          >
-            Order History
-          </button>
+      <Header user={user} onLogout={logout} onOrdersClick={() => navigate('/orders')} onSellerClick={() => navigate('/seller')} />
+      <main className="page page-narrow">
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">My Orders</h1>
+            <p className="page-subtitle">Things you've bought from other students.</p>
+          </div>
+          <Tabs
+            label="Order status"
+            value={activeTab}
+            onChange={switchTab}
+            items={[{ key: 'active', label: 'Active' }, { key: 'history', label: 'History' }]}
+          />
         </div>
-        
+
         <OrderFilters value={filters} onChange={setFilters} statusOptions={STATUSES_FOR_TAB[activeTab]} />
 
         {loading ? (
-          <p style={{ opacity: 0.7 }}>Loading orders…</p>
+          <p className="muted">Loading orders…</p>
         ) : orders.length === 0 ? (
-          <p>{filters.status || filters.from || filters.to ? 'No orders match these filters.' : `No ${activeTab} orders found.`}</p>
+          <EmptyState
+            icon={<Package size={22} />}
+            title={filtered ? 'No orders match these filters' : activeTab === 'active' ? 'No active orders' : 'No past orders yet'}
+            text={filtered ? 'Try clearing the filters.' : activeTab === 'active' ? 'Orders you place show up here until they are delivered.' : 'Delivered and cancelled orders will appear here.'}
+            action={!filtered && <button className="btn btn-primary" onClick={() => navigate('/')}>Browse listings</button>}
+          />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="stack">
             {orders.map(order => (
-              <div key={order.order_id} className="glass-panel" style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                <div>
-                  <h3 style={{ marginBottom: '0.5rem' }}>Order #{order.order_id} - {order.item_name}</h3>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                    {new Date(order.created_at).toLocaleString()}<br />
-                    Seller: {order.seller_name} ({order.seller_phone})<br />
-                    Quantity: {order.quantity} | Total: ₹{order.total_amount}<br />
-                    Status: <strong style={{ color: order.order_status === 'Cancelled' ? 'var(--secondary-color)' : 'var(--primary-color)' }}>{order.order_status}</strong>
-                  </p>
-                  {order.my_rating && (
-                    <div style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
-                      Your rating: <StarRating value={order.my_rating} />
-                      {order.my_review && <div style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>"{order.my_review}"</div>}
-                    </div>
-                  )}
-                </div>
-                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                  <button onClick={() => navigate(`/chat/${order.order_id}`)} className="auth-btn" style={{ marginTop: 0, padding: '0.5rem 1rem' }}>
-                    Chat
+              <OrderCard key={order.order_id} order={order} role="buyer">
+                {order.order_status !== 'Cancelled' && (
+                  <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/chat/${order.order_id}`)}>
+                    <MessageCircle size={15} /> Chat
                   </button>
-                  {order.order_status === 'Placed' && (
-                    <button onClick={() => handleCancel(order.order_id)} className="auth-btn" style={{ marginTop: 0, padding: '0.5rem 1rem', background: 'transparent', border: '1px solid var(--secondary-color)', color: 'var(--secondary-color)' }}>
-                      Cancel
-                    </button>
-                  )}
-                  {order.order_status === 'Delivered' && !order.my_rating && (
-                    <button onClick={() => openReview(order)} className="auth-btn" style={{ marginTop: 0, padding: '0.5rem 1rem', background: 'linear-gradient(90deg, #f1c40f, #f39c12)', color: '#000' }}>
-                      Rate seller
-                    </button>
-                  )}
-                  {activeTab === 'history' && (
-                    <button onClick={() => setReportModal({ show: true, order })} className="auth-btn" style={{ marginTop: 0, padding: '0.5rem 1rem', background: 'var(--secondary-color)', color: 'white' }}>
-                      Report
-                    </button>
-                  )}
-                </div>
-              </div>
+                )}
+                {order.order_status === 'Delivered' && !order.my_rating && (
+                  <button className="btn btn-primary btn-sm" onClick={() => setRating(order)}>
+                    <Star size={15} /> Rate seller
+                  </button>
+                )}
+                {order.order_status === 'Placed' && (
+                  <button className="btn btn-danger btn-sm" onClick={() => handleCancel(order.order_id)}>
+                    <X size={15} /> Cancel order
+                  </button>
+                )}
+                {activeTab === 'history' && (
+                  <button className="btn btn-link danger btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setReporting(order)}>
+                    <Flag size={14} /> Report
+                  </button>
+                )}
+              </OrderCard>
             ))}
           </div>
         )}
-      </div>
+      </main>
 
-      {reviewModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
-          <div className="glass-panel" style={{ padding: '2rem', width: '100%', maxWidth: '460px' }}>
-            <h3 style={{ marginBottom: '0.5rem' }}>Rate {reviewModal.seller_name}</h3>
-            <p style={{ fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--text-secondary)' }}>Order #{reviewModal.order_id} – {reviewModal.item_name}</p>
-            {reviewError && <div className="auth-error" style={{ marginBottom: '1rem' }}>{reviewError}</div>}
-            <form onSubmit={submitReview} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <StarRating value={reviewRating} onChange={setReviewRating} size={32} />
-              <textarea
-                placeholder="Anything other students should know? (optional)"
-                maxLength={500}
-                value={reviewComment}
-                onChange={e => setReviewComment(e.target.value)}
-                style={{ padding: '1rem', borderRadius: '12px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)', minHeight: '90px', resize: 'vertical' }}
-              />
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <button type="submit" className="auth-btn" style={{ flex: 1, marginTop: 0 }}>Submit rating</button>
-                <button type="button" onClick={() => setReviewModal(null)} className="auth-btn" style={{ flex: 1, marginTop: 0, background: 'transparent', border: '1px solid var(--text-secondary)' }}>Cancel</button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {rating && (
+        <RateDialog order={rating} onClose={() => setRating(null)} onSaved={() => { setRating(null); toast('Thanks for rating!'); fetchOrders(); }} />
       )}
-
-      {reportModal.show && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div className="glass-panel" style={{ padding: '2rem', width: '90%', maxWidth: '500px' }}>
-            <h3 style={{ marginBottom: '1rem', color: 'var(--secondary-color)' }}>Report Order #{reportModal.order.order_id}</h3>
-            <p style={{ fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--text-secondary)' }}>Report Seller: {reportModal.order.seller_name}</p>
-            <form onSubmit={submitReport} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <textarea 
-                placeholder="Why are you reporting this? Please provide details." 
-                required 
-                value={reportReason} 
-                onChange={e => setReportReason(e.target.value)}
-                style={{ padding: '1rem', borderRadius: '12px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)', minHeight: '100px', resize: 'vertical' }}
-              />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Attach Proof (Image)</label>
-                <input type="file" accept="image/*" onChange={handleFileChange} style={{ padding: '0.8rem', borderRadius: '12px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' }} />
-              </div>
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                <button type="submit" className="auth-btn" style={{ flex: 1, marginTop: 0, background: 'var(--secondary-color)' }}>Submit Report</button>
-                <button type="button" onClick={() => { setReportModal({ show: false, order: null }); setReportReason(''); setReportProof(''); }} className="auth-btn" style={{ flex: 1, marginTop: 0, background: 'transparent', border: '1px solid var(--text-secondary)' }}>Cancel</button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {reporting && (
+        <ReportDialog
+          order={reporting}
+          reportedUserId={reporting.seller_id}
+          reportedName={reporting.seller_name}
+          roleLabel="Seller"
+          onClose={() => setReporting(null)}
+        />
       )}
     </>
   );
