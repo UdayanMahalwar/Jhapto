@@ -23,7 +23,7 @@ async function lockAndCheckListing(conn, buyer_id, listing_id, quantity) {
      JOIN Item    i ON l.item_id   = i.item_id
      JOIN Student s ON l.seller_id = s.student_id
      WHERE l.listing_id = ?
-     FOR UPDATE`,
+     FOR UPDATE OF l`,
     [listing_id]
   );
   const listing = rows[0];
@@ -42,10 +42,8 @@ async function lockAndCheckListing(conn, buyer_id, listing_id, quantity) {
 }
 
 // ── POST /api/orders ─────────────────────────────────────────
-// Places a single order using the MySQL stored procedure place_order().
-// The procedure returns the new order id through session variables
-// (@order_id, @message), which only exist on the connection that ran the
-// CALL — so both queries must run on the same pooled connection.
+// Places a single order using the database function place_order(),
+// which returns (order_id, message); order_id is -1 when it refused.
 router.post('/', auth, async (req, res) => {
   const { listing_id, quantity } = req.body;
   const buyer_id = req.user.student_id;
@@ -54,20 +52,15 @@ router.post('/', auth, async (req, res) => {
     return res.status(400).json({ message: `listing_id and a quantity between 1 and ${MAX_QTY_PER_ITEM} are required.` });
   }
 
-  let conn;
   try {
-    conn = await db.getConnection();
-
-    const [own] = await conn.query('SELECT seller_id FROM Listing WHERE listing_id = ?', [listing_id]);
+    const [own] = await db.query('SELECT seller_id FROM Listing WHERE listing_id = ?', [listing_id]);
     if (own.length > 0 && Number(own[0].seller_id) === Number(buyer_id)) {
       return res.status(400).json({ message: "You can't buy your own listing." });
     }
 
-    await conn.query('CALL place_order(?, ?, ?, @order_id, @message)',
+    const [[result]] = await db.query(
+      'SELECT order_id, message FROM place_order(?, ?, ?)',
       [buyer_id, listing_id, quantity]
-    );
-    const [[result]] = await conn.query(
-      'SELECT @order_id AS order_id, @message AS message'
     );
 
     if (result.order_id == null || Number(result.order_id) === -1) {
@@ -84,8 +77,6 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ message: err.message });
     }
     res.status(500).json({ message: 'Error placing order.', error: err.message });
-  } finally {
-    if (conn) conn.release();
   }
 });
 
@@ -128,7 +119,7 @@ router.post('/checkout', auth, async (req, res) => {
       const price = Number(listing.selling_price);
 
       const [orderResult] = await conn.query(
-        "INSERT INTO `Order` (buyer_id, order_status, total_amount) VALUES (?, 'Placed', ?)",
+        `INSERT INTO "Order" (buyer_id, order_status, total_amount) VALUES (?, 'Placed', ?)`,
         [buyer_id, (price * quantity).toFixed(2)]
       );
       // trg_deduct_stock_on_order deducts stock (and re-checks it) on this insert
@@ -184,7 +175,7 @@ function buildOrderFilters(query) {
   if (to !== undefined && to !== '') {
     if (!isDate(String(to))) return { error: 'to must be a date (YYYY-MM-DD).' };
     if (from && String(from) > String(to)) return { error: 'from date must be before to date.' };
-    sql += ' AND o.created_at < DATE_ADD(?, INTERVAL 1 DAY)';
+    sql += ' AND o.created_at < (?::date + 1)';
     params.push(String(to));
   }
   return { sql, params };
@@ -202,7 +193,7 @@ router.get('/my', auth, async (req, res) => {
               o.total_amount, o.order_status, o.created_at,
               seller.name AS seller_name, seller.phone_no AS seller_phone, l.seller_id,
               rv.rating AS my_rating, rv.comment AS my_review
-       FROM \`Order\` o
+       FROM "Order" o
        JOIN Order_Item oi ON o.order_id    = oi.order_id
        JOIN Listing    l  ON oi.listing_id = l.listing_id
        JOIN Item       i  ON l.item_id     = i.item_id
@@ -230,7 +221,7 @@ router.get('/selling', auth, async (req, res) => {
               o.total_amount, o.order_status, o.created_at,
               buyer.name AS buyer_name, buyer.phone_no AS buyer_phone, o.buyer_id,
               rv.rating AS buyer_rating, rv.comment AS buyer_review
-       FROM \`Order\` o
+       FROM "Order" o
        JOIN Order_Item oi ON o.order_id    = oi.order_id
        JOIN Listing    l  ON oi.listing_id = l.listing_id
        JOIN Item       i  ON l.item_id     = i.item_id
@@ -255,7 +246,7 @@ router.patch('/:id/cancel', auth, async (req, res) => {
 
   try {
     const [rows] = await db.query(
-      'SELECT buyer_id, order_status FROM `Order` WHERE order_id = ?', [order_id]
+      'SELECT buyer_id, order_status FROM "Order" WHERE order_id = ?', [order_id]
     );
 
     if (rows.length === 0) {
@@ -266,7 +257,7 @@ router.patch('/:id/cancel', auth, async (req, res) => {
     }
 
     await db.query(
-      "UPDATE `Order` SET order_status = 'Cancelled' WHERE order_id = ?", [order_id]
+      `UPDATE "Order" SET order_status = 'Cancelled' WHERE order_id = ?`, [order_id]
     );
 
     realtime.emitToOrder(order_id, 'order:status', { order_id: Number(order_id), order_status: 'Cancelled' });
@@ -289,7 +280,7 @@ router.patch('/:id/confirm', auth, async (req, res) => {
   try {
     // Verify this order belongs to one of the seller's listings
     const [rows] = await db.query(
-      `SELECT o.order_id FROM \`Order\` o
+      `SELECT o.order_id FROM "Order" o
        JOIN Order_Item oi ON o.order_id    = oi.order_id
        JOIN Listing    l  ON oi.listing_id = l.listing_id
        WHERE o.order_id = ? AND l.seller_id = ?`,
@@ -301,7 +292,7 @@ router.patch('/:id/confirm', auth, async (req, res) => {
     }
 
     await db.query(
-      "UPDATE `Order` SET order_status = 'Confirmed' WHERE order_id = ?", [order_id]
+      `UPDATE "Order" SET order_status = 'Confirmed' WHERE order_id = ?`, [order_id]
     );
 
     realtime.emitToOrder(order_id, 'order:status', { order_id: Number(order_id), order_status: 'Confirmed' });
@@ -320,7 +311,7 @@ router.patch('/:id/deliver', auth, async (req, res) => {
 
   try {
     const [rows] = await db.query(
-      `SELECT o.order_id FROM \`Order\` o
+      `SELECT o.order_id FROM "Order" o
        JOIN Order_Item oi ON o.order_id    = oi.order_id
        JOIN Listing    l  ON oi.listing_id = l.listing_id
        WHERE o.order_id = ? AND l.seller_id = ?`,
@@ -332,7 +323,7 @@ router.patch('/:id/deliver', auth, async (req, res) => {
     }
 
     await db.query(
-      "UPDATE `Order` SET order_status = 'Delivered' WHERE order_id = ?", [order_id]
+      `UPDATE "Order" SET order_status = 'Delivered' WHERE order_id = ?`, [order_id]
     );
 
     realtime.emitToOrder(order_id, 'order:status', { order_id: Number(order_id), order_status: 'Delivered' });

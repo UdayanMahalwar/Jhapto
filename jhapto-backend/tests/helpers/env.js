@@ -6,6 +6,7 @@ const path = require('path');
 process.env.NODE_ENV            = 'test';
 process.env.USE_MOCK_DB         = 'false';
 process.env.DB_NAME             = process.env.TEST_DB_NAME || 'jhapto_test';
+process.env.DATABASE_URL = '';   // tests always use the local DB_* settings (dotenv won't override this)
 process.env.RATE_LIMIT_DISABLED = 'true';
 process.env.JWT_SECRET          = 'jhapto-test-secret';
 process.env.UPLOAD_DIR          = path.join(os.tmpdir(), 'jhapto-test-uploads');

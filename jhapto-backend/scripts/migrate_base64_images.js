@@ -10,9 +10,8 @@ require('../config/env');
 const fs     = require('fs');
 const path   = require('path');
 const crypto = require('crypto');
-const mysql  = require('mysql2/promise');
 const { sniffImageType } = require('../utils/imageType');
-const { connectionOptions } = require('../config/dbOptions');
+const db = require('../config/db');
 
 const TARGETS = [
   { table: 'Listing', id: 'listing_id', column: 'photo_url' },
@@ -21,7 +20,7 @@ const TARGETS = [
 
 async function main() {
   const apply = process.argv.includes('--apply');
-  const conn = await mysql.createConnection(connectionOptions());
+  const conn = db;
 
   let moved = 0, skipped = 0;
   try {

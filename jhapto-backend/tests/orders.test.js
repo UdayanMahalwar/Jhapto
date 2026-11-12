@@ -5,12 +5,12 @@ afterAll(() => db.end());
 
 const stock = async (listing_id) =>
   (await sql('SELECT quantity_available FROM Listing WHERE listing_id = ?', [listing_id]))[0].quantity_available;
-const orderCount = async () => (await sql('SELECT COUNT(*) AS n FROM `Order`'))[0].n;
+const orderCount = async () => (await sql('SELECT COUNT(*) AS n FROM "Order"'))[0].n;
 
 describe('POST /orders (stored procedure)', () => {
   test('returns the id of the order it created', async () => {
     const res = await api().post('/api/orders').set(bearer(await login('priya'))).send({ listing_id: 5, quantity: 1 }).expect(201);
-    const [row] = await sql('SELECT buyer_id FROM `Order` WHERE order_id = ?', [res.body.order_id]);
+    const [row] = await sql('SELECT buyer_id FROM "Order" WHERE order_id = ?', [res.body.order_id]);
     expect(row.buyer_id).toBe(STUDENTS.priya.id);
   });
 
@@ -24,7 +24,7 @@ describe('POST /orders (stored procedure)', () => {
     expect(results.every(r => r.status === 201)).toBe(true);
     expect(new Set(ids).size).toBe(20);
     for (const [i, r] of results.entries()) {
-      const [row] = await sql('SELECT buyer_id FROM `Order` WHERE order_id = ?', [r.body.order_id]);
+      const [row] = await sql('SELECT buyer_id FROM "Order" WHERE order_id = ?', [r.body.order_id]);
       expect(row.buyer_id).toBe(STUDENTS[['aarav', 'priya', 'rohan', 'karan'][i % 4]].id);
     }
   });
@@ -113,7 +113,7 @@ describe('order history filters', () => {
 
   test('filters by date range (inclusive)', async () => {
     const token = await login('priya');
-    const today = (await sql('SELECT DATE_FORMAT(CURDATE(), "%Y-%m-%d") AS d'))[0].d;
+    const today = (await sql("SELECT to_char(CURRENT_DATE, 'YYYY-MM-DD') AS d"))[0].d;
     const todays = await api().get(`/api/orders/my?from=${today}&to=${today}`).set(bearer(token)).expect(200);
     expect(todays.body.length).toBeGreaterThan(0);
     const future = await api().get('/api/orders/my?from=2099-01-01').set(bearer(token)).expect(200);

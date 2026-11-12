@@ -15,3 +15,6 @@ node_modules/
 
 # uploaded images (served from /uploads)
 jhapto-backend/uploads/
+
+# Vercel CLI link
+.vercel
