@@ -215,7 +215,7 @@ const query = async (sql, params = []) => {
 
   // 4. SELECT @order_id AS order_id, @message AS message
   if (/SELECT @order_id AS order_id/i.test(cleanSql)) {
-    return [[[lastPlacedOrderResult]]];
+    return [[lastPlacedOrderResult]];
   }
 
   // 5. SELECT fn_is_price_valid(?, ?) AS valid
@@ -602,9 +602,106 @@ const query = async (sql, params = []) => {
       reported_user_id: Number(reported_user_id),
       reason,
       proof_url,
+      status: 'Pending',
       created_at: new Date()
     });
     return [{ affectedRows: 1 }];
+  }
+
+  // ── Added with the security / checkout fixes ──────────────────
+  // Auth middleware ban check
+  if (/^SELECT is_banned FROM Student WHERE student_id = \?/i.test(cleanSql)) {
+    const s = students.find(st => st.student_id === Number(params[0]));
+    return [s ? [{ is_banned: s.is_banned }] : []];
+  }
+
+  // Registration: floor belongs to hostel
+  if (/SELECT floor_id FROM Floor WHERE floor_id = \? AND hostel_id = \?/i.test(cleanSql)) {
+    const f = floors.find(fl => fl.floor_id === Number(params[0]) && fl.hostel_id === Number(params[1]));
+    return [f ? [{ floor_id: f.floor_id }] : []];
+  }
+
+  // Admin list
+  if (/SELECT admin_id, name, email, created_at FROM Admin/i.test(cleanSql)) {
+    return [admins.map(({ admin_id, name, email, created_at }) => ({ admin_id, name, email, created_at }))];
+  }
+
+  // Checkout: lock + read listing
+  if (/SELECT l\.listing_id, l\.seller_id, l\.selling_price, l\.quantity_available/i.test(cleanSql)) {
+    const l = listings.find(lst => lst.listing_id === Number(params[0]));
+    if (!l) return [[]];
+    const item = items.find(i => i.item_id === l.item_id);
+    const seller = students.find(st => st.student_id === l.seller_id);
+    return [[{
+      listing_id: l.listing_id, seller_id: l.seller_id, selling_price: l.selling_price,
+      quantity_available: l.quantity_available, listing_status: l.listing_status,
+      item_name: item ? item.item_name : 'Item', seller_banned: seller ? seller.is_banned : false,
+    }]];
+  }
+
+  // Checkout: create order
+  if (/^INSERT INTO `Order` \(buyer_id, order_status, total_amount\)/i.test(cleanSql)) {
+    const order_id = nextOrderId++;
+    orders.push({ order_id, buyer_id: Number(params[0]), order_status: 'Placed', total_amount: Number(params[1]), created_at: new Date() });
+    return [{ insertId: order_id, affectedRows: 1 }];
+  }
+
+  // Checkout: order line (mirrors trg_deduct_stock_on_order + trg_auto_out_of_stock)
+  if (/^INSERT INTO Order_Item/i.test(cleanSql)) {
+    const [order_id, listing_id, quantity, price] = params.map(Number);
+    const l = listings.find(lst => lst.listing_id === listing_id);
+    if (!l || l.quantity_available < quantity) {
+      const err = new Error('ERROR: Insufficient stock for this listing.');
+      err.sqlState = '45000';
+      throw err;
+    }
+    l.quantity_available -= quantity;
+    if (l.quantity_available === 0 && l.listing_status === 'Active') l.listing_status = 'OutOfStock';
+    order_items.push({ order_item_id: nextOrderItemId++, order_id, listing_id, quantity, price_at_purchase: price });
+    return [{ insertId: nextOrderItemId - 1, affectedRows: 1 }];
+  }
+
+  // Reports: order participants
+  if (/^SELECT o\.buyer_id, l\.seller_id FROM `Order` o/i.test(cleanSql)) {
+    const o = orders.find(ord => ord.order_id === Number(params[0]));
+    if (!o) return [[]];
+    const oi = order_items.find(item => item.order_id === o.order_id);
+    const l = oi ? listings.find(lst => lst.listing_id === oi.listing_id) : null;
+    return [[{ buyer_id: o.buyer_id, seller_id: l ? l.seller_id : null }]];
+  }
+
+  // Reports: duplicate pending check
+  if (/SELECT report_id FROM Report WHERE order_id = \? AND reporter_id = \?/i.test(cleanSql)) {
+    return [reports.filter(r => r.order_id === Number(params[0]) && r.reporter_id === Number(params[1]) && r.status === 'Pending')
+      .map(r => ({ report_id: r.report_id }))];
+  }
+
+  // Admin: list reports
+  if (/FROM Report r JOIN Student rep/i.test(cleanSql)) {
+    const rows = reports.map(r => {
+      const rep = students.find(st => st.student_id === r.reporter_id) || {};
+      const tgt = students.find(st => st.student_id === r.reported_user_id) || {};
+      return {
+        report_id: r.report_id, order_id: r.order_id, reason: r.reason, status: r.status, created_at: r.created_at,
+        reporter_id: r.reporter_id, reporter_name: rep.name, reporter_email: rep.email,
+        reported_user_id: r.reported_user_id, reported_name: tgt.name, reported_email: tgt.email,
+        reported_is_banned: tgt.is_banned ? 1 : 0, has_proof: r.proof_url ? 1 : 0,
+      };
+    }).sort((a, b) => (b.status === 'Pending') - (a.status === 'Pending') || new Date(b.created_at) - new Date(a.created_at));
+    return [rows];
+  }
+
+  // Admin: report proof
+  if (/SELECT proof_url FROM Report WHERE report_id = \?/i.test(cleanSql)) {
+    const r = reports.find(rp => rp.report_id === Number(params[0]));
+    return [r ? [{ proof_url: r.proof_url }] : []];
+  }
+
+  // Admin: update report status
+  if (/UPDATE Report SET status = \? WHERE report_id = \?/i.test(cleanSql)) {
+    const r = reports.find(rp => rp.report_id === Number(params[1]));
+    if (r) r.status = params[0];
+    return [{ affectedRows: r ? 1 : 0 }];
   }
 
   console.warn('Unhandled SQL query:', cleanSql, params);
@@ -613,7 +710,13 @@ const query = async (sql, params = []) => {
 
 module.exports = {
   query,
-  getConnection: (cb) => {
-    if (cb) cb(null, { release: () => {} });
-  }
+  // Mirrors mysql2 pool.promise().getConnection(). Note: the mock has no real
+  // transactions — rollback() does not undo writes made earlier in a checkout.
+  getConnection: async () => ({
+    query,
+    beginTransaction: async () => {},
+    commit: async () => {},
+    rollback: async () => {},
+    release: () => {},
+  })
 };

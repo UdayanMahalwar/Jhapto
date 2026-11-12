@@ -24,7 +24,9 @@ export const AuthProvider = ({ children }) => {
   const loginUser = async (email, password) => {
     const res = await api.post('/auth/login', { email, password });
     localStorage.setItem('token', res.data.token);
+    localStorage.removeItem('admin');
     localStorage.setItem('user', JSON.stringify(res.data.student));
+    setAdmin(null);
     setUser(res.data.student);
     return res.data;
   };
@@ -32,7 +34,9 @@ export const AuthProvider = ({ children }) => {
   const loginAdmin = async (email, password) => {
     const res = await api.post('/admin/login', { email, password });
     localStorage.setItem('token', res.data.token);
-    const adminData = { email, is_admin: true }; // Extracting logic or token parsing can be added here
+    localStorage.removeItem('user');
+    setUser(null);
+    const adminData = { ...res.data.admin, is_admin: true };
     localStorage.setItem('admin', JSON.stringify(adminData));
     setAdmin(adminData);
     return res.data;

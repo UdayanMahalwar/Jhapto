@@ -91,17 +91,16 @@ const HomePage = () => {
 
   const handleCheckout = async () => {
     try {
-      for (const item of cartItems) {
-        await api.post('/orders', {
-          listing_id: item.listing_id,
-          quantity: item.quantity
-        });
-      }
-      showNotification('Order(s) placed successfully!');
+      // One request, one database transaction: all items are ordered or none are
+      const res = await api.post('/orders/checkout', {
+        items: cartItems.map(item => ({ listing_id: item.listing_id, quantity: item.quantity }))
+      });
+      showNotification(res.data.message || 'Order(s) placed successfully!');
       setCartItems([]);
       setTimeout(() => navigate('/orders'), 1500);
     } catch (err) {
       showNotification(err.response?.data?.message || 'Error placing order', 'error');
+      fetchProducts(); // stock may have changed — refresh what's available
     }
   };
 

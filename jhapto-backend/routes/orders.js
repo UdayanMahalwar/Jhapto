@@ -5,29 +5,72 @@ const express = require('express');
 const router  = express.Router();
 const db      = require('../config/db');
 const auth    = require('../middleware/auth');
+const v       = require('../utils/validate');
+
+const MAX_QTY_PER_ITEM = 100;
+const MAX_CART_LINES   = 20;
+
+// Throws a 400-style error that the handlers turn into a JSON response
+class OrderError extends Error {}
+
+// Locks the listing row for the rest of the transaction and checks it can be bought
+async function lockAndCheckListing(conn, buyer_id, listing_id, quantity) {
+  const [rows] = await conn.query(
+    `SELECT l.listing_id, l.seller_id, l.selling_price, l.quantity_available,
+            l.listing_status, i.item_name, s.is_banned AS seller_banned
+     FROM Listing l
+     JOIN Item    i ON l.item_id   = i.item_id
+     JOIN Student s ON l.seller_id = s.student_id
+     WHERE l.listing_id = ?
+     FOR UPDATE`,
+    [listing_id]
+  );
+  const listing = rows[0];
+  if (!listing || listing.listing_status !== 'Active' || listing.seller_banned) {
+    throw new OrderError(`Listing #${listing_id} is no longer available.`);
+  }
+  if (Number(listing.seller_id) === Number(buyer_id)) {
+    throw new OrderError(`You can't buy your own listing (${listing.item_name}).`);
+  }
+  if (Number(listing.quantity_available) < quantity) {
+    throw new OrderError(
+      `Only ${listing.quantity_available} left of ${listing.item_name}. Update your cart and try again.`
+    );
+  }
+  return listing;
+}
 
 // ── POST /api/orders ─────────────────────────────────────────
-// Places a new order using the MySQL stored procedure
+// Places a single order using the MySQL stored procedure place_order().
+// The procedure returns the new order id through session variables
+// (@order_id, @message), which only exist on the connection that ran the
+// CALL — so both queries must run on the same pooled connection.
 router.post('/', auth, async (req, res) => {
   const { listing_id, quantity } = req.body;
   const buyer_id = req.user.student_id;
 
-  if (!listing_id || !quantity) {
-    return res.status(400).json({ message: 'listing_id and quantity are required.' });
+  if (!v.isIntInRange(listing_id, 1, 2147483647) || !v.isIntInRange(quantity, 1, MAX_QTY_PER_ITEM)) {
+    return res.status(400).json({ message: `listing_id and a quantity between 1 and ${MAX_QTY_PER_ITEM} are required.` });
   }
 
+  let conn;
   try {
-    // Call the stored procedure place_order()
-    await db.query('CALL place_order(?, ?, ?, @order_id, @message)',
+    conn = await db.getConnection();
+
+    const [own] = await conn.query('SELECT seller_id FROM Listing WHERE listing_id = ?', [listing_id]);
+    if (own.length > 0 && Number(own[0].seller_id) === Number(buyer_id)) {
+      return res.status(400).json({ message: "You can't buy your own listing." });
+    }
+
+    await conn.query('CALL place_order(?, ?, ?, @order_id, @message)',
       [buyer_id, listing_id, quantity]
     );
-
-    const [[result]] = await db.query(
+    const [[result]] = await conn.query(
       'SELECT @order_id AS order_id, @message AS message'
     );
 
-    if (result.order_id === -1) {
-      return res.status(400).json({ message: result.message });
+    if (result.order_id == null || Number(result.order_id) === -1) {
+      return res.status(400).json({ message: result.message || 'Order could not be placed.' });
     }
 
     res.status(201).json({
@@ -39,6 +82,75 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ message: err.message });
     }
     res.status(500).json({ message: 'Error placing order.', error: err.message });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+// ── POST /api/orders/checkout ────────────────────────────────
+// Places every item in the cart in ONE transaction: either all orders are
+// created or none are (no half-placed carts). One Order row per listing, so
+// each seller confirms / chats about their own item as before.
+// Body: { items: [{ listing_id, quantity }, ...] }
+router.post('/checkout', auth, async (req, res) => {
+  const buyer_id = req.user.student_id;
+  const { items } = req.body;
+
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ message: 'Your cart is empty.' });
+  }
+  if (items.length > MAX_CART_LINES) {
+    return res.status(400).json({ message: `A cart can have at most ${MAX_CART_LINES} different items.` });
+  }
+
+  // Validate and merge duplicate lines for the same listing
+  const qtyByListing = new Map();
+  for (const item of items) {
+    if (!item || !v.isIntInRange(item.listing_id, 1, 2147483647) || !v.isIntInRange(item.quantity, 1, MAX_QTY_PER_ITEM)) {
+      return res.status(400).json({ message: `Each cart item needs a listing and a quantity between 1 and ${MAX_QTY_PER_ITEM}.` });
+    }
+    const id = Number(item.listing_id);
+    qtyByListing.set(id, (qtyByListing.get(id) || 0) + Number(item.quantity));
+  }
+  // Lock rows in a fixed order so two concurrent checkouts can't deadlock
+  const lines = [...qtyByListing.entries()].sort((a, b) => a[0] - b[0]);
+
+  let conn;
+  try {
+    conn = await db.getConnection();
+    await conn.beginTransaction();
+
+    const orderIds = [];
+    for (const [listing_id, quantity] of lines) {
+      const listing = await lockAndCheckListing(conn, buyer_id, listing_id, quantity);
+      const price = Number(listing.selling_price);
+
+      const [orderResult] = await conn.query(
+        "INSERT INTO `Order` (buyer_id, order_status, total_amount) VALUES (?, 'Placed', ?)",
+        [buyer_id, (price * quantity).toFixed(2)]
+      );
+      // trg_deduct_stock_on_order deducts stock (and re-checks it) on this insert
+      await conn.query(
+        `INSERT INTO Order_Item (order_id, listing_id, quantity, price_at_purchase)
+         VALUES (?, ?, ?, ?)`,
+        [orderResult.insertId, listing_id, quantity, price]
+      );
+      orderIds.push(orderResult.insertId);
+    }
+
+    await conn.commit();
+    res.status(201).json({
+      message  : orderIds.length === 1 ? 'Order placed successfully!' : `${orderIds.length} orders placed successfully!`,
+      order_ids: orderIds,
+    });
+  } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    if (err instanceof OrderError || err.sqlState === '45000') {
+      return res.status(400).json({ message: err.message });
+    }
+    res.status(500).json({ message: 'Error placing order. No orders were placed.', error: err.message });
+  } finally {
+    if (conn) conn.release();
   }
 });
 
