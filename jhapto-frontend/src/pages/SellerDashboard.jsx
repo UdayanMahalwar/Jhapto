@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Header from '../components/Header';
 import { AuthContext } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import api from '../utils/api';
 import { uploadImage } from '../utils/upload';
 import OrderFilters from '../components/OrderFilters';
@@ -14,7 +15,10 @@ const SellerDashboard = () => {
   const [listings, setListings] = useState([]);
   const [orders, setOrders] = useState([]);
   const [items, setItems] = useState([]);
-  const [activeOrderTab, setActiveOrderTab] = useState('active'); // 'active' or 'history'
+  // Order tab lives in the URL (?tab=history) so notifications can link to it
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeOrderTab = searchParams.get('tab') === 'history' ? 'history' : 'active';
+  const [photoInputKey, setPhotoInputKey] = useState(0);   // bump to reset the file picker
   const [reportModal, setReportModal] = useState({ show: false, order: null });
   const [reportReason, setReportReason] = useState('');
   const [reportProof, setReportProof] = useState('');
@@ -42,12 +46,7 @@ const SellerDashboard = () => {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  const [notification, setNotification] = useState({ message: '', type: '' });
-
-  const showNotification = (message, type = 'success') => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification({ message: '', type: '' }), 3000);
-  };
+  const showNotification = useToast();
 
   useEffect(() => {
     fetchData();
@@ -84,7 +83,7 @@ const SellerDashboard = () => {
   };
 
   const switchOrderTab = (tab) => {
-    setActiveOrderTab(tab);
+    setSearchParams(tab === 'history' ? { tab: 'history' } : {}, { replace: true });
     setOrderFilters(EMPTY_FILTERS);
   };
 
@@ -126,7 +125,9 @@ const SellerDashboard = () => {
     try {
       await api.post('/listings', newListing);
       showNotification('Listing created successfully!');
-      setNewListing({ item_id: items[0]?.item_id || '', mrp: '', selling_price: '', quantity_available: '', description: '', photo_url: '', room_number: '' });
+      // keep the item and room — sellers usually list several things from the same room
+      setNewListing(prev => ({ ...prev, mrp: '', selling_price: '', quantity_available: '', description: '', photo_url: '' }));
+      setPhotoInputKey(k => k + 1);   // the photo was used; clear the picker so it doesn't look attached
       fetchData();
     } catch (err) {
       showNotification(err.response?.data?.message || 'Error creating listing', 'error');
@@ -159,11 +160,11 @@ const SellerDashboard = () => {
     (url) => setNewListing(prev => ({ ...prev, photo_url: url })),
     (msg) => showNotification(msg, 'error'));
 
-  const handleReportFileChange = (e) => pickImage(e, setReportProof, (msg) => alert(msg));
+  const handleReportFileChange = (e) => pickImage(e, setReportProof, (msg) => showNotification(msg, 'error'));
 
   const submitReport = async (e) => {
     e.preventDefault();
-    if (!reportReason) return alert('Reason is required');
+    if (!reportReason) return showNotification('Reason is required', 'error');
     try {
       await api.post('/reports', {
         order_id: reportModal.order.order_id,
@@ -171,32 +172,20 @@ const SellerDashboard = () => {
         reason: reportReason,
         proof_url: reportProof
       });
-      alert('Report submitted successfully!');
+      showNotification('Report submitted. Admins will review it.');
       setReportModal({ show: false, order: null });
       setReportReason('');
       setReportProof('');
     } catch (err) {
-      alert(err.response?.data?.message || 'Error submitting report');
+      showNotification(err.response?.data?.message || 'Error submitting report', 'error');
     }
   };
 
   return (
     <>
-      <Header cartCount={0} user={user} onLogout={logout} onOrdersClick={() => navigate('/orders')} onSellerClick={() => navigate('/seller')} />
+      <Header user={user} onLogout={logout} onOrdersClick={() => navigate('/orders')} onSellerClick={() => navigate('/seller')} />
       
-      {notification.message && (
-        <div style={{
-          position: 'fixed', top: '80px', left: '50%', transform: 'translateX(-50%)', zIndex: 1000,
-          background: notification.type === 'error' ? 'var(--secondary-color)' : 'var(--primary-color)',
-          color: notification.type === 'error' ? 'white' : 'black',
-          padding: '1rem 2rem', borderRadius: '30px', fontWeight: 'bold', boxShadow: '0 10px 20px rgba(0,0,0,0.5)',
-          animation: 'slideDown 0.3s ease-out'
-        }}>
-          {notification.message}
-        </div>
-      )}
-      
-      <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+      <div className="seller-grid">
         
         {/* LEFT COLUMN: Manage Listings */}
         <div>
@@ -213,8 +202,8 @@ const SellerDashboard = () => {
                 {items.map(item => <option key={item.item_id} value={item.item_id}>{item.item_name} ({item.brand})</option>)}
               </select>
               <div style={{ display: 'flex', gap: '1rem' }}>
-                <input type="number" placeholder="MRP" required value={newListing.mrp} onChange={(e) => setNewListing({...newListing, mrp: e.target.value})} style={{ flex: 1, padding: '0.8rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' }} />
-                <input type="number" placeholder="Selling Price" required value={newListing.selling_price} onChange={(e) => setNewListing({...newListing, selling_price: e.target.value})} style={{ flex: 1, padding: '0.8rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' }} />
+                <input type="number" placeholder="MRP" required value={newListing.mrp} onChange={(e) => setNewListing({...newListing, mrp: e.target.value})} style={{ flex: 1, minWidth: 0, padding: '0.8rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' }} />
+                <input type="number" placeholder="Selling Price" required value={newListing.selling_price} onChange={(e) => setNewListing({...newListing, selling_price: e.target.value})} style={{ flex: 1, minWidth: 0, padding: '0.8rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' }} />
               </div>
               <input type="number" placeholder="Quantity Available" required value={newListing.quantity_available} onChange={(e) => setNewListing({...newListing, quantity_available: e.target.value})} style={{ padding: '0.8rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' }} />
               <input type="text" placeholder="Room Number (e.g., K-204)" required value={newListing.room_number} onChange={(e) => setNewListing({...newListing, room_number: e.target.value})} style={{ padding: '0.8rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' }} />
@@ -222,7 +211,14 @@ const SellerDashboard = () => {
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Product Photo (Take a picture or upload)</label>
-                <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" capture="environment" onChange={handleFileChange} style={{ padding: '0.8rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' }} />
+                <input key={photoInputKey} type="file" accept="image/png,image/jpeg,image/gif,image/webp" capture="environment" onChange={handleFileChange} style={{ padding: '0.8rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)', maxWidth: '100%' }} />
+                {newListing.photo_url && !uploading && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <img src={newListing.photo_url} alt="Selected product" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: '8px' }} />
+                    <button type="button" onClick={() => { setNewListing(prev => ({ ...prev, photo_url: '' })); setPhotoInputKey(k => k + 1); }}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--secondary-color)', cursor: 'pointer' }}>Remove photo</button>
+                  </div>
+                )}
                 {uploading && <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)' }}>Uploading…</span>}
               </div>
 
@@ -232,8 +228,11 @@ const SellerDashboard = () => {
 
           <h3>My Listings</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+            {listings.length === 0 && (
+              <p style={{ color: 'var(--text-secondary)' }}>You haven't listed anything yet. Add your first item above.</p>
+            )}
             {listings.map(l => (
-              <div key={l.listing_id} className="glass-panel" style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div key={l.listing_id} className="glass-panel" style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', opacity: l.listing_status === 'Removed' ? 0.55 : 1 }}>
                 <div>
                   <h4>{l.item_name}</h4>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Price: ₹{l.selling_price} | Stock: {l.quantity_available} | Status: {l.listing_status}{l.room_number ? ` | Room ${l.room_number}` : ''}</p>
@@ -244,7 +243,7 @@ const SellerDashboard = () => {
                       {l.listing_status === 'OutOfStock' ? 'Restock' : 'Edit'}
                     </button>
                   )}
-                  {l.listing_status === 'Active' && (
+                  {l.listing_status !== 'Removed' && (
                     <button onClick={() => handleDeleteListing(l.listing_id)} style={{ background: 'transparent', color: 'var(--secondary-color)', border: 'none', cursor: 'pointer' }}>Remove</button>
                   )}
                 </div>
@@ -257,7 +256,7 @@ const SellerDashboard = () => {
         <div>
           <h2 style={{ marginBottom: '1.5rem' }}>Received Orders</h2>
 
-          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.5rem' }}>
             <button 
               onClick={() => switchOrderTab('active')}
               className="auth-btn" 
@@ -320,11 +319,11 @@ const SellerDashboard = () => {
             {editError && <div className="auth-error" style={{ marginBottom: '1rem' }}>{editError}</div>}
             <form onSubmit={handleSaveEdit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', gap: '1rem' }}>
-                <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                <label style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                   MRP (₹)
                   <input type="number" min="0.01" step="0.01" required value={editListing.mrp} onChange={(e) => setEditListing({ ...editListing, mrp: e.target.value })} style={fieldStyle} />
                 </label>
-                <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                <label style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                   Selling price (₹)
                   <input type="number" min="0.01" step="0.01" required value={editListing.selling_price} onChange={(e) => setEditListing({ ...editListing, selling_price: e.target.value })} style={fieldStyle} />
                 </label>

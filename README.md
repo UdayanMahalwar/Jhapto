@@ -29,7 +29,7 @@ npm run dev                                          # http://localhost:3000
 ```
 Seed logins: any student (e.g. `aarav@tiet.ac.in`) / `password123`, admin `admin@jhapto.com` / `admin123`.
 
-`npm run dev` restarts the server when backend code changes; frontend changes hot-reload in the browser.
+`npm run dev` (nodemon, see `nodemon.json`) restarts the server when backend code changes; frontend changes hot-reload in the browser.
 Set `USE_MOCK_DB=true` in `jhapto-backend/.env` to run without MySQL (in-memory data, resets on restart).
 
 ### Production
@@ -45,13 +45,13 @@ npm run build && npm start
 | `npm test` | API + live-chat test suite against a throwaway `jhapto_test` database |
 | `npm run db:setup` | Create the database from `jhapto-database/*.sql` (`-- --reset` drops and rebuilds it) |
 | `npm run images:migrate` | Move old base64 images out of the database into `jhapto-backend/uploads/` (dry run; add `-- --apply`) |
-| `node jhapto-backend/scripts/insert_items.js` | Add the extended snack catalogue to the Item table |
 
 ## Updating an existing database
-If your database was created before ratings/notifications were added, apply the migrations once:
+If your database was created with an older version of this repo, apply the migrations you don't have yet, in order:
 ```bash
 mysql -u root jhapto < jhapto-database/jhapto_migrations.sql      # only if it predates room numbers / reports
 mysql -u root jhapto < jhapto-database/jhapto_migrations_v2.sql   # seller ratings, notifications
+mysql -u root jhapto < jhapto-database/jhapto_migrations_v3.sql   # categories + catalogue, delivered-only revenue
 npm run images:migrate -- --apply                                  # if listings/reports have base64 images
 ```
 

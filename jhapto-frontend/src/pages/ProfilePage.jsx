@@ -77,7 +77,7 @@ const ProfilePage = () => {
 
   return (
     <>
-      <Header cartCount={0} user={user} onLogout={logout} onOrdersClick={() => navigate('/orders')} onSellerClick={() => navigate('/seller')} />
+      <Header user={user} onLogout={logout} onOrdersClick={() => navigate('/orders')} onSellerClick={() => navigate('/seller')} />
       <div style={{ padding: '2rem 1rem', maxWidth: '1000px', margin: '0 auto' }}>
         <h2 className="text-gradient" style={{ marginBottom: '1.5rem' }}>My Profile</h2>
 

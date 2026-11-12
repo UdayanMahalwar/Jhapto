@@ -55,6 +55,8 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     disconnectSocket();
+    // drop saved carts so the next person on this browser starts empty
+    Object.keys(localStorage).filter(k => k.startsWith('cart:')).forEach(k => localStorage.removeItem(k));
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('admin');

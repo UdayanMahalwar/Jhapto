@@ -2,16 +2,19 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, MapPin, ShoppingBag, User } from 'lucide-react';
 import NotificationBell from './NotificationBell';
+import { useCart } from '../contexts/CartContext';
 import './Header.css';
 
-const Header = ({ cartCount, user, onLogout, onOrdersClick, onSellerClick, searchQuery, onSearchChange }) => {
+const Header = ({ user, onLogout, onOrdersClick, onSellerClick, searchQuery, onSearchChange }) => {
   const navigate = useNavigate();
+  const cart = useCart();
+  const cartCount = cart ? cart.count : 0;
 
   return (
     <header className="header glass-panel">
       <div className="header-container">
         <div className="logo-section">
-          <h1 className="logo text-gradient" onClick={() => window.location.href='/'} style={{cursor: 'pointer'}}>JHAPTO</h1>
+          <h1 className="logo text-gradient" onClick={() => navigate('/')} style={{cursor: 'pointer'}}>JHAPTO</h1>
         </div>
         
         <div className="location-section">
@@ -19,7 +22,7 @@ const Header = ({ cartCount, user, onLogout, onOrdersClick, onSellerClick, searc
             <MapPin size={16} className="location-icon" />
             <div className="location-text">
               <span className="location-title">Delivery to</span>
-              <span className="location-value">{user ? `Hostel ${user.hostel_id}, F-${user.floor_number ?? user.floor_id}` : 'Login to view'}</span>
+              <span className="location-value">{user ? `${user.hostel_name || `Hostel ${user.hostel_id}`}, F-${user.floor_number ?? user.floor_id}` : 'Login to view'}</span>
             </div>
           </div>
         </div>
@@ -40,7 +43,7 @@ const Header = ({ cartCount, user, onLogout, onOrdersClick, onSellerClick, searc
         <div className="actions-section">
           {user && (
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Hi, {user.name.split(' ')[0]}</span>
+              <span className="header-greeting" style={{ fontSize: '0.9rem', fontWeight: 600 }}>Hi, {user.name.split(' ')[0]}</span>
               <NotificationBell />
               <button className="icon-btn" onClick={onOrdersClick} title="My Orders" style={{ fontSize: '0.8rem', width: 'auto', padding: '0 10px', borderRadius: '12px' }}>Orders</button>
               <button className="icon-btn" onClick={onSellerClick} title="Seller Dashboard" style={{ fontSize: '0.8rem', width: 'auto', padding: '0 10px', borderRadius: '12px' }}>Sell</button>
@@ -51,11 +54,11 @@ const Header = ({ cartCount, user, onLogout, onOrdersClick, onSellerClick, searc
             </div>
           )}
           {!user && (
-            <button className="icon-btn" onClick={() => window.location.href='/login'}>
+            <button className="icon-btn" onClick={() => navigate('/login')} aria-label="Log in">
               <User size={22} />
             </button>
           )}
-          <button className="icon-btn cart-btn">
+          <button className="icon-btn cart-btn" onClick={() => navigate('/cart')} title="Cart" aria-label={`Cart${cartCount ? ` (${cartCount} items)` : ''}`}>
             <ShoppingBag size={22} />
             {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
           </button>
