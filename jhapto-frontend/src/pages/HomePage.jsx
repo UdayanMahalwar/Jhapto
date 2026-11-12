@@ -148,7 +148,7 @@ const HomePage = () => {
         
         <div className="products-section">
           <div className="section-header">
-            <h3 className="section-title">{selectedCategory ? `${selectedCategory} near you` : `Trending on Floor ${user?.floor_id}`}</h3>
+            <h3 className="section-title">{selectedCategory ? `${selectedCategory} near you` : `Trending on Floor ${user?.floor_number ?? user?.floor_id}`}</h3>
             <button className="view-all-btn" onClick={() => setSelectedCategory(null)}>View All</button>
           </div>
           
@@ -168,6 +168,7 @@ const HomePage = () => {
                     onAdd={handleAddToCart}
                     onRemove={handleRemoveFromCart}
                     cartQuantity={cartItem ? cartItem.quantity : 0}
+                    isOwn={Number(product.seller_id) === Number(user?.student_id)}
                   />
                 );
               })

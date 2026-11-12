@@ -154,23 +154,60 @@ router.post('/checkout', auth, async (req, res) => {
   }
 });
 
+// ── Order list filters ───────────────────────────────────────
+// ?status=Delivered,Cancelled  &from=YYYY-MM-DD  &to=YYYY-MM-DD (inclusive)
+const ORDER_STATUSES = ['Placed', 'Confirmed', 'Delivered', 'Cancelled'];
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const isDate = (d) => DATE_RE.test(d) && !Number.isNaN(Date.parse(d + 'T00:00:00Z'));
+
+function buildOrderFilters(query) {
+  let sql = '';
+  const params = [];
+  const { status, from, to } = query;
+
+  if (status !== undefined && status !== '') {
+    const list = String(status).split(',').map(x => x.trim()).filter(Boolean);
+    if (list.length === 0 || list.some(x => !ORDER_STATUSES.includes(x))) {
+      return { error: `status must be a comma-separated list of: ${ORDER_STATUSES.join(', ')}` };
+    }
+    sql += ` AND o.order_status IN (${list.map(() => '?').join(', ')})`;
+    params.push(...list);
+  }
+  if (from !== undefined && from !== '') {
+    if (!isDate(String(from))) return { error: 'from must be a date (YYYY-MM-DD).' };
+    sql += ' AND o.created_at >= ?';
+    params.push(String(from));
+  }
+  if (to !== undefined && to !== '') {
+    if (!isDate(String(to))) return { error: 'to must be a date (YYYY-MM-DD).' };
+    if (from && String(from) > String(to)) return { error: 'from date must be before to date.' };
+    sql += ' AND o.created_at < DATE_ADD(?, INTERVAL 1 DAY)';
+    params.push(String(to));
+  }
+  return { sql, params };
+}
+
 // ── GET /api/orders/my ───────────────────────────────────────
 // Returns all orders placed by the logged-in buyer
 router.get('/my', auth, async (req, res) => {
   const buyer_id = req.user.student_id;
+  const filters = buildOrderFilters(req.query);
+  if (filters.error) return res.status(400).json({ message: filters.error });
   try {
     const [rows] = await db.query(
       `SELECT o.order_id, i.item_name, oi.quantity, oi.price_at_purchase,
               o.total_amount, o.order_status, o.created_at,
-              seller.name AS seller_name, seller.phone_no AS seller_phone, l.seller_id
+              seller.name AS seller_name, seller.phone_no AS seller_phone, l.seller_id,
+              rv.rating AS my_rating, rv.comment AS my_review
        FROM \`Order\` o
        JOIN Order_Item oi ON o.order_id    = oi.order_id
        JOIN Listing    l  ON oi.listing_id = l.listing_id
        JOIN Item       i  ON l.item_id     = i.item_id
        JOIN Student    seller ON l.seller_id = seller.student_id
-       WHERE o.buyer_id = ?
-       ORDER BY o.created_at DESC`,
-      [buyer_id]
+       LEFT JOIN Review rv ON rv.order_id = o.order_id
+       WHERE o.buyer_id = ?${filters.sql}
+       ORDER BY o.created_at DESC, o.order_id DESC`,
+      [buyer_id, ...filters.params]
     );
     res.json(rows);
   } catch (err) {
@@ -182,19 +219,23 @@ router.get('/my', auth, async (req, res) => {
 // Returns all orders received by the logged-in student as a seller
 router.get('/selling', auth, async (req, res) => {
   const seller_id = req.user.student_id;
+  const filters = buildOrderFilters(req.query);
+  if (filters.error) return res.status(400).json({ message: filters.error });
   try {
     const [rows] = await db.query(
       `SELECT o.order_id, i.item_name, oi.quantity, oi.price_at_purchase,
               o.total_amount, o.order_status, o.created_at,
-              buyer.name AS buyer_name, buyer.phone_no AS buyer_phone, o.buyer_id
+              buyer.name AS buyer_name, buyer.phone_no AS buyer_phone, o.buyer_id,
+              rv.rating AS buyer_rating, rv.comment AS buyer_review
        FROM \`Order\` o
        JOIN Order_Item oi ON o.order_id    = oi.order_id
        JOIN Listing    l  ON oi.listing_id = l.listing_id
        JOIN Item       i  ON l.item_id     = i.item_id
        JOIN Student    buyer ON o.buyer_id = buyer.student_id
-       WHERE l.seller_id = ?
-       ORDER BY o.created_at DESC`,
-      [seller_id]
+       LEFT JOIN Review rv ON rv.order_id = o.order_id
+       WHERE l.seller_id = ?${filters.sql}
+       ORDER BY o.created_at DESC, o.order_id DESC`,
+      [seller_id, ...filters.params]
     );
     res.json(rows);
   } catch (err) {

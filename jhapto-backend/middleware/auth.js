@@ -28,7 +28,7 @@ const authMiddleware = async (req, res, next) => {
 
   try {
     const [rows] = await db.query(
-      'SELECT is_banned FROM Student WHERE student_id = ?', [decoded.student_id]
+      'SELECT is_banned, name, floor_id, hostel_id FROM Student WHERE student_id = ?', [decoded.student_id]
     );
     if (rows.length === 0) {
       return res.status(401).json({ message: 'Account no longer exists.', code: 'INVALID_TOKEN' });
@@ -36,11 +36,19 @@ const authMiddleware = async (req, res, next) => {
     if (rows[0].is_banned) {
       return res.status(403).json({ message: 'Your account has been banned. Contact admin.', code: 'ACCOUNT_BANNED' });
     }
+
+    // Use current profile values, not the ones frozen into the token at login
+    // (the student may have changed floor or name since).
+    req.user = {
+      student_id: decoded.student_id,
+      name      : rows[0].name,
+      floor_id  : rows[0].floor_id,
+      hostel_id : rows[0].hostel_id,
+    };
   } catch (err) {
     return res.status(500).json({ message: 'Server error.', error: err.message });
   }
 
-  req.user = decoded;  // { student_id, name, floor_id }
   next();
 };
 
