@@ -6,11 +6,21 @@ require('./config/env');
 
 const express = require('express');
 const cors    = require('cors');
+const uploadStore = require('./utils/uploadStore');
+
+const UPLOAD_NAME_RE = /^[0-9a-f]{32}\.(png|jpg|gif|webp)$/;
+const UPLOAD_HEADERS = {
+  'Cache-Control': 'public, max-age=2592000, immutable',   // names are random and never reused
+  'X-Content-Type-Options': 'nosniff',
+  'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'",
+};
 
 function createApp() {
   const app = express();
 
   app.disable('x-powered-by');
+  // Behind a hosting proxy (Render, etc.) use the real client IP for rate limiting
+  if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY);
   app.use(cors());
   app.use(express.json({ limit: '1mb' }));   // images go through /api/uploads, not JSON
   app.use(express.urlencoded({ limit: '1mb', extended: true }));
@@ -36,15 +46,28 @@ function createApp() {
   });
 
   // ── Uploaded images ────────────────────────────────────────
-  app.use('/uploads', express.static(process.env.UPLOAD_DIR, {
-    maxAge: '30d',
-    immutable: true,          // names are random and never reused
-    index: false,
-    setHeaders: (res) => {
-      res.setHeader('X-Content-Type-Options', 'nosniff');
-      res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'");
-    },
-  }));
+  if (uploadStore.usesDatabase()) {
+    app.get('/uploads/:name', async (req, res, next) => {
+      if (!UPLOAD_NAME_RE.test(req.params.name)) return res.status(404).end();
+      try {
+        const file = await uploadStore.load(req.params.name);
+        if (!file) return res.status(404).end();
+        res.set({ ...UPLOAD_HEADERS, 'Content-Type': file.mime_type }).send(file.data);
+      } catch (err) {
+        next(err);
+      }
+    });
+  } else {
+    app.use('/uploads', express.static(process.env.UPLOAD_DIR, {
+      maxAge: '30d',
+      immutable: true,
+      index: false,
+      setHeaders: (res) => {
+        res.setHeader('X-Content-Type-Options', UPLOAD_HEADERS['X-Content-Type-Options']);
+        res.setHeader('Content-Security-Policy', UPLOAD_HEADERS['Content-Security-Policy']);
+      },
+    }));
+  }
 
   // Malformed JSON bodies etc. → JSON error instead of an HTML stack trace
   // eslint-disable-next-line no-unused-vars

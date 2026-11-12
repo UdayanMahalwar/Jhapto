@@ -14,6 +14,7 @@ const SCHEMA_FILES = [
   'jhapto_migrations.sql',
   'jhapto_migrations_v2.sql',
   'jhapto_migrations_v3.sql',
+  'jhapto_migrations_v4.sql',
 ];
 
 // Split a SQL script into statements, honouring DELIMITER changes.

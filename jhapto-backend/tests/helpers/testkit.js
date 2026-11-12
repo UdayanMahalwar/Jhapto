@@ -4,6 +4,7 @@ const request = require('supertest');
 const { createApp } = require('../../app');
 const db = require('../../config/db');
 const { buildDatabase } = require('../../scripts/lib/sqlRunner');
+const { connectionOptions } = require('../../config/dbOptions');
 
 // Seed data (jhapto_database.sql + migrations). Student ids 1-5 sell listings 1-5.
 const STUDENTS = {
@@ -18,12 +19,7 @@ const ADMIN = { email: 'admin@jhapto.com', password: 'admin123' };
 
 // Drop and rebuild the test database from the real SQL files (~0.5s)
 async function resetDb() {
-  const conn = await mysql.createConnection({
-    host    : process.env.DB_HOST || 'localhost',
-    port    : Number(process.env.DB_PORT) || 3306,
-    user    : process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-  });
+  const conn = await mysql.createConnection(connectionOptions({ database: false }));
   try {
     await buildDatabase(conn, process.env.DB_NAME, { drop: true });
   } finally {

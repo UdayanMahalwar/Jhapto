@@ -5,13 +5,12 @@
 
 const express = require('express');
 const crypto  = require('crypto');
-const fs      = require('fs');
-const path    = require('path');
 const multer  = require('multer');
 const { rateLimit } = require('express-rate-limit');
 const auth    = require('../middleware/auth');
 const { MAX_IMAGE_BYTES } = require('../utils/validate');
 const { sniffImageType } = require('../utils/imageType');
+const uploadStore = require('../utils/uploadStore');
 
 const router = express.Router();
 
@@ -51,8 +50,7 @@ router.post('/', auth, uploadLimiter, (req, res) => {
 
     const name = `${crypto.randomBytes(16).toString('hex')}.${ext}`;
     try {
-      await fs.promises.mkdir(process.env.UPLOAD_DIR, { recursive: true });
-      await fs.promises.writeFile(path.join(process.env.UPLOAD_DIR, name), req.file.buffer, { flag: 'wx' });
+      await uploadStore.save(name, req.file.buffer, ext, req.user.student_id);
       res.status(201).json({ url: `/uploads/${name}` });
     } catch (e) {
       res.status(500).json({ message: 'Error saving image.', error: e.message });
