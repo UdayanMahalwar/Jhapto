@@ -84,7 +84,7 @@ const HomePage = () => {
       />
 
       <main className="main-content">
-        <HeroBanner />
+        <HeroBanner hostelName={user?.hostel_name} />
         <CategoryList categories={categories} selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
 
         <div className="products-section">

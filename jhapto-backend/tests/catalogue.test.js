@@ -80,3 +80,11 @@ test('unread chat counts are broken down per chat', async () => {
   await api().get('/api/messages/2').set(bearer(aarav)).expect(200);   // opening the chat reads it
   expect((await api().get('/api/messages/unread').set(bearer(aarav))).body).toEqual({ unread_count: 0, chats: [] });
 });
+
+test('chat endpoint returns the order context for the chat header', async () => {
+  // Seed order 3: Priya bought Sneha's Amul Kool Milk
+  const asBuyer = (await api().get('/api/messages/3').set(bearer(await login('priya'))).expect(200)).body;
+  expect(asBuyer.order).toEqual({ item_name: 'Amul Kool Milk', quantity: 1, role: 'buyer', other_name: 'Sneha Gupta' });
+  const asSeller = (await api().get('/api/messages/3').set(bearer(await login('sneha'))).expect(200)).body;
+  expect(asSeller.order).toMatchObject({ role: 'seller', other_name: 'Priya Mehta' });
+});

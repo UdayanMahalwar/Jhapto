@@ -1,12 +1,13 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, MapPin, ShoppingBag, User } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Search, MapPin, ShoppingBag, User, LogOut } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import { useCart } from '../contexts/CartContext';
 import './Header.css';
 
 const Header = ({ user, onLogout, onOrdersClick, onSellerClick, searchQuery, onSearchChange }) => {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const cart = useCart();
   const cartCount = cart ? cart.count : 0;
 
@@ -45,12 +46,14 @@ const Header = ({ user, onLogout, onOrdersClick, onSellerClick, searchQuery, onS
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
               <span className="header-greeting" style={{ fontSize: '0.9rem', fontWeight: 600 }}>Hi, {user.name.split(' ')[0]}</span>
               <NotificationBell />
-              <button className="icon-btn" onClick={onOrdersClick} title="My Orders" style={{ fontSize: '0.8rem', width: 'auto', padding: '0 10px', borderRadius: '12px' }}>Orders</button>
-              <button className="icon-btn" onClick={onSellerClick} title="Seller Dashboard" style={{ fontSize: '0.8rem', width: 'auto', padding: '0 10px', borderRadius: '12px' }}>Sell</button>
-              <button className="icon-btn" onClick={() => navigate('/profile')} title="My Profile" aria-label="My Profile">
+              <button className={`nav-link ${pathname.startsWith('/orders') ? 'active' : ''}`} onClick={onOrdersClick} aria-current={pathname.startsWith('/orders') ? 'page' : undefined}>Orders</button>
+              <button className={`nav-link ${pathname.startsWith('/seller') ? 'active' : ''}`} onClick={onSellerClick} aria-current={pathname.startsWith('/seller') ? 'page' : undefined}>Sell</button>
+              <button className={`icon-btn ${pathname === '/profile' ? 'active' : ''}`} onClick={() => navigate('/profile')} title="My profile" aria-label="My profile">
                 <User size={20} />
               </button>
-              <button className="icon-btn" onClick={onLogout} title="Logout" style={{ fontSize: '0.8rem', width: 'auto', padding: '0 10px', borderRadius: '12px', color: 'var(--secondary-color)' }}>Logout</button>
+              <button className="icon-btn" onClick={onLogout} title="Log out" aria-label="Log out">
+                <LogOut size={19} />
+              </button>
             </div>
           )}
           {!user && (
@@ -58,7 +61,7 @@ const Header = ({ user, onLogout, onOrdersClick, onSellerClick, searchQuery, onS
               <User size={22} />
             </button>
           )}
-          <button className="icon-btn cart-btn" onClick={() => navigate('/cart')} title="Cart" aria-label={`Cart${cartCount ? ` (${cartCount} items)` : ''}`}>
+          <button className={`icon-btn cart-btn ${pathname === '/cart' ? 'active' : ''}`} onClick={() => navigate('/cart')} title="Cart" aria-label={`Cart${cartCount ? ` (${cartCount} items)` : ''}`}>
             <ShoppingBag size={22} />
             {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
           </button>
