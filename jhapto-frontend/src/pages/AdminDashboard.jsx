@@ -4,6 +4,7 @@ import { AuthContext } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { BarChart3, Package, Users, Flag, ShieldCheck, LogOut } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
+import ThemeToggle from '../components/ThemeToggle';
 import EmptyState from '../components/EmptyState';
 import api from '../utils/api';
 
@@ -127,11 +128,12 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-color)', color: 'white' }}>
-      <header className="glass-panel" style={{ padding: '1rem clamp(1rem, 4vw, 2rem)', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'space-between', alignItems: 'center', borderRadius: 0, borderTop: 0, borderLeft: 0, borderRight: 0 }}>
-        <h1 className="text-gradient" style={{ fontSize: 'clamp(1.4rem, 5vw, 1.9rem)', fontWeight: 800 }}>JHAPTO <span style={{ fontWeight: 500 }}>Admin</span></h1>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-color)', color: 'var(--text-primary)' }}>
+      <header style={{ background: 'var(--header-bg)', backdropFilter: 'blur(16px)', borderBottom: '1px solid var(--border-color)', position: 'sticky', top: 0, zIndex: 50, padding: '1rem clamp(1rem, 4vw, 2rem)', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'space-between', alignItems: 'center', borderRadius: 0, borderTop: 0, borderLeft: 0, borderRight: 0 }}>
+        <h1 style={{ fontSize: 'clamp(1.4rem, 5vw, 1.8rem)', fontWeight: 800, letterSpacing: '-0.06em' }}>jhapto<span style={{ color: 'var(--primary-color)' }}>.</span> <span style={{ fontWeight: 600, fontSize: '0.6em', letterSpacing: 0, color: 'var(--text-secondary)' }}>admin</span></h1>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <span style={{ fontWeight: 'bold' }}>{admin?.name || admin?.email}</span>
+          <ThemeToggle />
           <button onClick={handleLogout} className="btn btn-ghost btn-sm"><LogOut size={15} /> Log out</button>
         </div>
       </header>

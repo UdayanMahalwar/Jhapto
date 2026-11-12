@@ -1,24 +1,82 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-:root {
-  --bg-color: #0b0c10;
-  --surface-color: #1f2833;
-  --surface-glass: rgba(31, 40, 51, 0.7);
-  --primary-color: #45f3ff;
-  --secondary-color: #f72585;
-  --text-primary: #ffffff;
-  --text-secondary: #c5c6c7;
-  --border-color: rgba(255, 255, 255, 0.1);
-  --neon-glow: 0 0 10px rgba(69, 243, 255, 0.5), 0 0 20px rgba(69, 243, 255, 0.3);
-  --radius: 16px;
-  --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+/* ── Design tokens ─────────────────────────────────────────────
+   Light theme follows the soft, minimal food-delivery reference:
+   warm grey background, white rounded cards, soft shadows, orange accent.
+   [data-theme] is set on <html> by ThemeContext (and early in index.html). */
+:root,
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg-color: #edebe8;
+  --surface-color: #ffffff;
+  --surface-glass: rgba(255, 255, 255, 0.86);
+  --surface-2: rgba(20, 18, 16, 0.04);
+  --surface-3: rgba(20, 18, 16, 0.075);
+  --input-bg: #f5f4f2;
+  --header-bg: rgba(237, 235, 232, 0.8);
+  --text-primary: #1b1a19;
+  --text-secondary: #7a7570;
+  --border-color: rgba(20, 18, 16, 0.08);
+  --primary-color: #ff6a3d;
+  --primary-strong: #f0531f;
+  --on-primary: #ffffff;
+  --primary-soft: rgba(255, 106, 61, 0.12);
+  --secondary-color: #e5484d;
+  --danger-soft: rgba(229, 72, 77, 0.12);
+  --success: #2a9d5c;
+  --warning: #d99212;
+  --star: #f5a524;
+  --banner-bg: #151413;
+  --banner-text: #ffffff;
+  --shadow-sm: 0 2px 8px rgba(40, 30, 20, 0.05);
+  --shadow-md: 0 10px 30px rgba(40, 30, 20, 0.08);
+  --shadow-lg: 0 24px 60px rgba(40, 30, 20, 0.16);
+  --neon-glow: 0 10px 26px rgba(255, 106, 61, 0.35);
+  --focus-ring: 0 0 0 3px rgba(255, 106, 61, 0.35);
+  --radius: 22px;
+  --transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg-color: #0f0f10;
+  --surface-color: #1b1b1d;
+  --surface-glass: rgba(27, 27, 29, 0.86);
+  --surface-2: rgba(255, 255, 255, 0.04);
+  --surface-3: rgba(255, 255, 255, 0.08);
+  --input-bg: #242427;
+  --header-bg: rgba(15, 15, 16, 0.78);
+  --text-primary: #f4f2ef;
+  --text-secondary: #9d9893;
+  --border-color: rgba(255, 255, 255, 0.07);
+  --primary-color: #ff7a50;
+  --primary-strong: #ff6a3d;
+  --on-primary: #ffffff;
+  --primary-soft: rgba(255, 122, 80, 0.16);
+  --secondary-color: #ff6369;
+  --danger-soft: rgba(255, 99, 105, 0.15);
+  --success: #4cc38a;
+  --warning: #f5b942;
+  --star: #f5b942;
+  --banner-bg: #26211e;
+  --banner-text: #ffffff;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 12px 30px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --neon-glow: 0 10px 26px rgba(255, 122, 80, 0.3);
+  --focus-ring: 0 0 0 3px rgba(255, 122, 80, 0.4);
 }
 
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
@@ -26,9 +84,21 @@ body {
   color: var(--text-primary);
   min-height: 100vh;
   overflow-x: hidden;
-  background-image: 
-    radial-gradient(circle at 15% 50%, rgba(247, 37, 133, 0.08), transparent 25%),
-    radial-gradient(circle at 85% 30%, rgba(69, 243, 255, 0.08), transparent 25%);
+  letter-spacing: -0.01em;
+}
+
+/* Smooth colour change when switching theme (only while switching, so it
+   never slows down normal animations) */
+html.theme-switching,
+html.theme-switching * {
+  transition: background-color 0.45s ease, color 0.45s ease, border-color 0.45s ease, box-shadow 0.45s ease, fill 0.45s ease !important;
+}
+
+/* Circular reveal for the theme toggle (View Transitions API) */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
 }
 
 ::-webkit-scrollbar {
@@ -50,15 +120,14 @@ body {
 }
 
 .glass-panel {
-  background: var(--surface-glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--surface-color);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
 }
 
 .text-gradient {
-  background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+  background: linear-gradient(90deg, var(--primary-color), #ff9a5a);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -151,10 +220,10 @@ body {
 
 .admin-tab:hover {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--surface-2);
 }
 
 .admin-tab[aria-current='page'] {
   color: var(--primary-color);
-  background: rgba(69, 243, 255, 0.1);
+  background: var(--primary-soft);
 }

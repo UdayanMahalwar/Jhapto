@@ -72,6 +72,7 @@
 }
 
 .bubble {
+  animation: bubble-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   max-width: min(75%, 520px);
   padding: 0.6rem 0.9rem 0.45rem;
   border-radius: 16px;
@@ -85,8 +86,8 @@
 
 .bubble.mine {
   align-self: flex-end;
-  background: linear-gradient(135deg, var(--primary-color), #00b8e6);
-  color: #00161c;
+  background: var(--primary-color);
+  color: var(--on-primary);
   border-bottom-right-radius: 5px;
 }
 
@@ -134,4 +135,16 @@
   .chat-page {
     height: calc(100dvh - 150px);
   }
+}
+
+@keyframes bubble-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.92); }
+  to { opacity: 1; transform: none; }
+}
+
+.bubble.mine { transform-origin: bottom right; }
+.bubble.theirs { transform-origin: bottom left; }
+
+.chat-messages {
+  background: var(--surface-color);
 }

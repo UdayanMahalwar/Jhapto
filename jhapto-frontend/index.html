@@ -5,6 +5,18 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Jhapto</title>
+    <meta name="theme-color" content="#edebe8" />
+    <script>
+      // Apply the saved (or system) theme before first paint so there's no flash
+      (function () {
+        var theme;
+        try { theme = localStorage.getItem('theme'); } catch (e) {}
+        if (theme !== 'light' && theme !== 'dark') {
+          theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script>
     <meta name="description" content="Hostel Quick Commerce platform for college students with floor-priority listings, instant ordering, real-time order chat, and admin analytics dashboard." />
     <meta property="og:title" content="Jhapto" />
     <meta property="og:description" content="Hostel Quick Commerce platform for college students with floor-priority listings, instant ordering, real-time order chat, and admin analytics dashboard." />

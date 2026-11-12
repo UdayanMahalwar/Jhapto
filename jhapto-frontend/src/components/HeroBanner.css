@@ -1,122 +1,104 @@
-.hero-banner {
-  margin: 1.5rem auto 2rem;
-  max-width: 1200px;
-  width: calc(100% - 4rem);
-  min-height: 200px;
-  border-radius: 24px;
-  background: linear-gradient(135deg, rgba(69, 243, 255, 0.1) 0%, rgba(247, 37, 133, 0.1) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 2rem 3rem;
+.promo-banner {
   position: relative;
   overflow: hidden;
-  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.5);
+  max-width: 1200px;
+  width: calc(100% - 2 * clamp(1rem, 3vw, 2rem));
+  margin: 1.25rem auto 1.75rem;
+  min-height: 210px;
+  border-radius: 30px;
+  background: var(--banner-bg);
+  color: var(--banner-text);
+  display: flex;
+  align-items: center;
+  box-shadow: var(--shadow-lg);
+  isolation: isolate;
 }
 
-.banner-content {
+.promo-glow {
+  position: absolute;
+  inset: -40% -10% auto auto;
+  width: 520px;
+  height: 520px;
+  background: radial-gradient(circle, rgba(255, 106, 61, 0.45), transparent 60%);
+  filter: blur(10px);
+  z-index: -1;
+  animation: promo-breathe 9s ease-in-out infinite;
+}
+
+@keyframes promo-breathe {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.9; }
+  50% { transform: translate(-40px, 30px) scale(1.12); opacity: 1; }
+}
+
+.promo-content {
   position: relative;
   z-index: 2;
-  max-width: 50%;
+  padding: 2rem clamp(1.4rem, 4vw, 2.75rem);
+  max-width: 560px;
 }
 
-.banner-title {
-  font-size: clamp(1.6rem, 3.5vw, 2.6rem);
-  line-height: 1.1;
-  font-weight: 800;
-  margin-bottom: 1rem;
+.promo-kicker {
+  display: inline-block;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: 0.85rem;
 }
 
-.banner-subtitle {
-  font-size: 1.05rem;
-  color: var(--text-secondary);
-  margin: 0;
-  max-width: 46ch;
-}
-
-.banner-btn {
-  background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
-  color: white;
-  border: none;
-  padding: 0.8rem 2rem;
-  font-size: 1.1rem;
+.promo-title {
+  font-size: clamp(1.55rem, 3.4vw, 2.5rem);
   font-weight: 700;
-  border-radius: 30px;
-  cursor: pointer;
-  transition: var(--transition);
-  box-shadow: var(--neon-glow);
+  line-height: 1.12;
+  letter-spacing: -0.035em;
 }
 
-.banner-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 0 20px rgba(247, 37, 133, 0.6), 0 0 40px rgba(69, 243, 255, 0.4);
+.promo-title span {
+  color: #ff9a6b;
 }
 
-.banner-visuals {
-  position: relative;
-  width: 280px;
-  height: 200px;
-  flex-shrink: 0;
+.promo-sub {
+  margin-top: 0.7rem;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.98rem;
+  max-width: 44ch;
 }
 
-.floating-item {
+.promo-visual {
   position: absolute;
-  font-size: 4rem;
-  animation: float 6s ease-in-out infinite;
-  filter: drop-shadow(0 10px 10px rgba(0,0,0,0.5));
+  inset: 0;
+  pointer-events: none;
 }
 
-.item-1 {
-  top: 20%;
-  left: 10%;
-  animation-delay: 0s;
+.floater {
+  position: absolute;
+  filter: drop-shadow(0 14px 18px rgba(0, 0, 0, 0.45));
+  will-change: transform;
 }
 
-.item-2 {
-  top: 50%;
-  right: 10%;
-  font-size: 5rem;
-  animation-delay: -2s;
-}
-
-.item-3 {
-  bottom: 10%;
-  left: 40%;
-  font-size: 3.5rem;
-  animation-delay: -4s;
-}
-
-@keyframes float {
-  0% { transform: translateY(0px) rotate(0deg); }
-  50% { transform: translateY(-20px) rotate(10deg); }
-  100% { transform: translateY(0px) rotate(0deg); }
-}
-
-@media (max-width: 768px) {
-  .hero-banner {
-    width: calc(100% - 2rem);
-    margin: 1rem auto 1.5rem;
-    padding: 1.25rem 1.25rem;
+@media (max-width: 720px) {
+  .promo-banner {
+    margin: 0.75rem auto 1.25rem;
     min-height: 0;
-    border-radius: 18px;
+    border-radius: 24px;
   }
 
-  .banner-content {
-    max-width: 100%;
+  .promo-content {
+    padding: 1.4rem 1.25rem;
+    max-width: 72%;
   }
 
-  .banner-visuals {
+  .promo-sub {
+    font-size: 0.85rem;
+  }
+
+  .floater {
+    font-size: 40px !important;
+  }
+
+  .floater:nth-child(3),
+  .floater:nth-child(4) {
     display: none;
-  }
-
-  .banner-subtitle {
-    font-size: 0.92rem;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .floating-item {
-    animation: none;
   }
 }

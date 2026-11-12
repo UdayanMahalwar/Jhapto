@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, MessageCircle } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import api from '../utils/api';
+import CountBadge from './CountBadge';
 import { getSocket } from '../utils/socket';
 
 const POLL_MS = 60000;   // fallback only — updates are pushed over Socket.IO
@@ -90,18 +92,20 @@ const NotificationBell = () => {
         aria-expanded={open}
         style={{ position: 'relative' }}
       >
-        <Bell size={20} />
-        {badge > 0 && <span className="cart-badge" style={{ background: 'var(--secondary-color)' }}>{badge > 99 ? '99+' : badge}</span>}
+        <motion.span key={badge} style={{ display: 'flex' }} animate={badge > 0 ? { rotate: [0, -16, 12, -8, 0] } : {}} transition={{ duration: 0.6 }}>
+          <Bell size={19} />
+        </motion.span>
+        <CountBadge count={badge} className="cart-badge danger" />
       </button>
 
+      <AnimatePresence>
       {open && (
-        <div
-          className="glass-panel"
-          style={{
-            position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 'min(340px, calc(100vw - 32px))',
-            maxHeight: '420px', overflowY: 'auto', zIndex: 1100, padding: '0.5rem',
-            background: 'var(--surface-color)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-          }}
+        <motion.div
+          className="notif-panel"
+          initial={{ opacity: 0, y: -8, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -6, scale: 0.97, transition: { duration: 0.15 } }}
+          transition={{ type: 'spring', stiffness: 520, damping: 34 }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem' }}>
             <strong>Notifications</strong>
@@ -116,7 +120,7 @@ const NotificationBell = () => {
             <button
               key={`chat-${c.order_id}`}
               onClick={() => { setOpen(false); navigate(`/chat/${c.order_id}`); }}
-              style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', width: '100%', textAlign: 'left', padding: '0.6rem', borderRadius: '8px', border: 'none', cursor: 'pointer', background: 'rgba(69, 243, 255, 0.08)', color: 'white', marginBottom: '0.25rem' }}
+              className="notif-item unread chat"
             >
               <MessageCircle size={16} color="var(--primary-color)" style={{ flexShrink: 0 }} />
               <span style={{ fontSize: '0.85rem', lineHeight: 1.35 }}>
@@ -134,17 +138,15 @@ const NotificationBell = () => {
             <button
               key={n.notification_id}
               onClick={() => openNotification(n)}
-              style={{
-                display: 'block', width: '100%', textAlign: 'left', padding: '0.6rem', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                background: n.is_read ? 'transparent' : 'rgba(247, 37, 133, 0.08)', color: 'white', marginBottom: '0.25rem',
-              }}
+              className={`notif-item ${n.is_read ? '' : 'unread'}`}
             >
               <div style={{ fontSize: '0.85rem', fontWeight: n.is_read ? 400 : 600, lineHeight: 1.35 }}>{n.message}</div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>{timeAgo(n.created_at)}</div>
             </button>
           ))}
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </div>
   );
 };

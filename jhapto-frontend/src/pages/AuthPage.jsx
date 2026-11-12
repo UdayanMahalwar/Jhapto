@@ -3,6 +3,8 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
 import api from '../utils/api';
 import { readAuthMessage, clearAuthMessage } from '../utils/authMessage';
+import { AnimatePresence, motion } from 'framer-motion';
+import AuthShell from '../components/AuthShell';
 import './AuthPage.css';
 
 const AuthPage = () => {
@@ -40,17 +42,23 @@ const AuthPage = () => {
   if (user) return <Navigate to="/" replace />;
 
   return (
-    <div className="auth-container">
-      <div className="auth-card glass-panel">
-        <h2 className="text-gradient auth-title">JHAPTO</h2>
-        <h3 className="auth-subtitle">{isLogin ? 'Welcome Back' : 'Create an Account'}</h3>
-        
-        {error && <div className="auth-error" role="alert">{error}</div>}
-        {success && <div className="auth-error" role="status" style={{ background: 'rgba(46, 204, 113, 0.2)', color: '#2ecc71', border: '1px solid #2ecc71' }}>{success}</div>}
-        
+    <AuthShell>
+        <h2 className="auth-title">jhapto<span>.</span></h2>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.p key={isLogin ? 'in' : 'up'} className="auth-subtitle" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
+            {isLogin ? 'Welcome back! Log in to grab a snack.' : 'Create your account to buy and sell in your hostel.'}
+          </motion.p>
+        </AnimatePresence>
+
+        {error && <div className="alert alert-error" role="alert" style={{ marginBottom: '1rem' }}>{error}</div>}
+        {success && <div className="alert alert-success" role="status" style={{ marginBottom: '1rem' }}>{success}</div>}
+
         <form className="auth-form" onSubmit={handleSubmit}>
+          <AnimatePresence initial={false}>
           {!isLogin && (
-            <>
+            <motion.div key="register-fields" className="auth-extra"
+              initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}>
               <input type="text" name="name" placeholder="Full Name" required maxLength={100} onChange={handleChange} />
               <input type="tel" name="phone_no" placeholder="Phone Number (10 digits)" required pattern="[6-9][0-9]{9}" title="10-digit mobile number" maxLength={10} onChange={handleChange} />
               
@@ -67,31 +75,29 @@ const AuthPage = () => {
                   <option value={6}>Floor 6</option>
                 </select>
               </div>
-            </>
+            </motion.div>
           )}
+          </AnimatePresence>
           
           <input type="email" name="email" placeholder="Email Address" required onChange={handleChange} />
           <input type="password" name="password" placeholder={isLogin ? 'Password' : 'Password (min 6 characters)'} required minLength={isLogin ? undefined : 6} onChange={handleChange} />
           
-          <button type="submit" className="auth-btn">
-            {isLogin ? 'Login' : 'Register'}
-          </button>
+          <motion.button type="submit" className="auth-btn" whileTap={{ scale: 0.97 }}>
+            {isLogin ? 'Log in' : 'Create account'}
+          </motion.button>
         </form>
         
         <p className="auth-switch">
           {isLogin ? "Don't have an account? " : "Already have an account? "}
-          <span onClick={() => { setIsLogin(!isLogin); setError(''); setSuccess(''); }} className="text-gradient" style={{cursor: 'pointer'}}>
-            {isLogin ? 'Register' : 'Login'}
-          </span>
+          <button type="button" className="auth-link" onClick={() => { setIsLogin(!isLogin); setError(''); setSuccess(''); }}>
+            {isLogin ? 'Register' : 'Log in'}
+          </button>
         </p>
 
-        <p className="auth-switch" style={{ marginTop: '1rem' }}>
-          <span onClick={() => navigate('/admin/login')} className="text-gradient" style={{cursor: 'pointer', opacity: 0.8, fontSize: '0.9rem'}}>
-            Admin Portal Access
-          </span>
+        <p className="auth-switch" style={{ marginTop: '0.75rem' }}>
+          <button type="button" className="auth-link muted" onClick={() => navigate('/admin/login')}>Admin portal</button>
         </p>
-      </div>
-    </div>
+    </AuthShell>
   );
 };
 
