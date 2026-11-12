@@ -96,7 +96,6 @@ let nextOrderItemId = 20;
 let nextMessageId = 20;
 let nextReportId = 10;
 
-let lastPlacedOrderResult = { order_id: -1, message: '' };
 
 // ── Ratings & notifications (mirror the v2 migration's tables + triggers) ──
 const reviews = [];
@@ -142,7 +141,7 @@ const sellerRating = (student_id) => {
   return { avg_rating: avg.toFixed(2), rating_count: mine.length };
 };
 
-// Applies the "AND o.order_status IN (...) AND o.created_at >= ? AND o.created_at < DATE_ADD(?...)"
+// Applies the "AND o.order_status IN (...) AND o.created_at >= ? AND o.created_at < (?::date + 1)"
 // filters built by routes/orders.js. `params[0]` is the buyer/seller id.
 const applyOrderFilters = (rows, sql, params) => {
   let i = 1;
@@ -157,7 +156,7 @@ const applyOrderFilters = (rows, sql, params) => {
     const from = new Date(params[i++] + 'T00:00:00');
     rows = rows.filter(r => new Date(r.created_at) >= from);
   }
-  if (/DATE_ADD\(\?, INTERVAL 1 DAY\)/i.test(sql)) {
+  if (/\(\?::date \+ 1\)/i.test(sql)) {
     const to = new Date(params[i++] + 'T00:00:00');
     to.setDate(to.getDate() + 1);
     rows = rows.filter(r => new Date(r.created_at) < to);
@@ -169,8 +168,8 @@ const applyOrderFilters = (rows, sql, params) => {
 const query = async (sql, params = []) => {
   const cleanSql = sql.trim().replace(/\s+/g, ' ');
 
-  // 1. CALL sp_floor_priority_listings(?)
-  if (/CALL sp_floor_priority_listings/i.test(cleanSql)) {
+  // 1. SELECT * FROM sp_floor_priority_listings(?)
+  if (/FROM sp_floor_priority_listings\(/i.test(cleanSql)) {
     const buyer_floor_id = Number(params[0]);
     const activeListings = listings.filter(l => {
       const seller = students.find(s => s.student_id === l.seller_id);
@@ -206,11 +205,11 @@ const query = async (sql, params = []) => {
       return b.listing_id - a.listing_id;
     });
 
-    return [[result]];
+    return [result];
   }
 
-  // 2. CALL sp_admin_report() — earned = Delivered, pending = Placed/Confirmed; banned students included
-  if (/CALL sp_admin_report/i.test(cleanSql)) {
+  // 2. SELECT * FROM sp_admin_report() — earned = Delivered, pending = Placed/Confirmed; banned students included
+  if (/FROM sp_admin_report\(/i.test(cleanSql)) {
     const sellerTotal = (student_id, statuses) => {
       let sum = 0;
       orders.filter(o => statuses.includes(o.order_status)).forEach(o => {
@@ -235,24 +234,22 @@ const query = async (sql, params = []) => {
       };
     }).sort((a, b) => b.total_revenue - a.total_revenue || b.pending_revenue - a.pending_revenue);
 
-    return [[reportRows]];
+    return [reportRows];
   }
 
-  // 3. CALL place_order(?, ?, ?, @order_id, @message)
-  if (/CALL place_order/i.test(cleanSql)) {
+  // 3. SELECT order_id, message FROM place_order(?, ?, ?)
+  if (/FROM place_order\(/i.test(cleanSql)) {
     const buyer_id = Number(params[0]);
     const listing_id = Number(params[1]);
     const quantity = Number(params[2]);
 
     const listing = listings.find(l => l.listing_id === listing_id);
     if (!listing || listing.listing_status !== 'Active') {
-      lastPlacedOrderResult = { order_id: -1, message: 'ERROR: Listing is not active or does not exist.' };
-      return [{ affectedRows: 0 }];
+      return [[{ order_id: -1, message: 'ERROR: Listing is not active or does not exist.' }]];
     }
 
     if (listing.quantity_available < quantity) {
-      lastPlacedOrderResult = { order_id: -1, message: 'ERROR: Not enough stock available.' };
-      return [{ affectedRows: 0 }];
+      return [[{ order_id: -1, message: 'ERROR: Not enough stock available.' }]];
     }
 
     // Deduct stock
@@ -282,14 +279,10 @@ const query = async (sql, params = []) => {
     });
 
     notifyNewOrder(newOrderId, listing_id, quantity);
-    lastPlacedOrderResult = { order_id: newOrderId, message: 'SUCCESS: Order placed successfully.' };
-    return [{ affectedRows: 1 }];
+    return [[{ order_id: newOrderId, message: 'SUCCESS: Order placed successfully.' }]];
   }
 
-  // 4. SELECT @order_id AS order_id, @message AS message
-  if (/SELECT @order_id AS order_id/i.test(cleanSql)) {
-    return [[lastPlacedOrderResult]];
-  }
+
 
   // 5. SELECT fn_is_price_valid(?, ?) AS valid
   if (/fn_is_price_valid/i.test(cleanSql)) {
@@ -300,7 +293,7 @@ const query = async (sql, params = []) => {
   }
 
   // 6. Student Register Checks & Inserts
-  if (/SELECT student_id FROM Student WHERE email =/i.test(cleanSql)) {
+  if (/SELECT student_id FROM Student WHERE lower\(email\) = lower\(\?\)/i.test(cleanSql)) {
     const found = students.filter(s => s.email.toLowerCase() === String(params[0]).toLowerCase());
     return [found.map(s => ({ student_id: s.student_id }))];
   }
@@ -335,7 +328,7 @@ const query = async (sql, params = []) => {
   }
 
   // 8. Admin Register & Login
-  if (/SELECT admin_id FROM Admin WHERE email =/i.test(cleanSql)) {
+  if (/SELECT admin_id FROM Admin WHERE lower\(email\) = lower\(\?\)/i.test(cleanSql)) {
     const found = admins.filter(a => a.email.toLowerCase() === String(params[0]).toLowerCase());
     return [found.map(a => ({ admin_id: a.admin_id }))];
   }
@@ -353,7 +346,7 @@ const query = async (sql, params = []) => {
     return [{ insertId: newAdmin.admin_id, affectedRows: 1 }];
   }
 
-  if (/SELECT \* FROM Admin WHERE email =/i.test(cleanSql)) {
+  if (/SELECT \* FROM Admin WHERE lower\(email\) = lower\(\?\)/i.test(cleanSql)) {
     const found = admins.filter(a => a.email.toLowerCase() === String(params[0]).toLowerCase());
     return [found];
   }
@@ -495,7 +488,7 @@ const query = async (sql, params = []) => {
   }
 
   // 17. Orders: My Orders (Buyer)
-  if (/FROM `Order` o JOIN Order_Item oi .* WHERE o\.buyer_id =/i.test(cleanSql)) {
+  if (/FROM "Order" o JOIN Order_Item oi .* WHERE o\.buyer_id =/i.test(cleanSql)) {
     const buyer_id = Number(params[0]);
     const userOrders = orders.filter(o => o.buyer_id === buyer_id);
     const rows = userOrders.map(o => {
@@ -522,7 +515,7 @@ const query = async (sql, params = []) => {
   }
 
   // 18. Orders: Selling Orders (Seller)
-  if (/FROM `Order` o JOIN Order_Item oi .* WHERE l\.seller_id =/i.test(cleanSql)) {
+  if (/FROM "Order" o JOIN Order_Item oi .* WHERE l\.seller_id =/i.test(cleanSql)) {
     const seller_id = Number(params[0]);
     const rows = [];
     orders.forEach(o => {
@@ -552,13 +545,13 @@ const query = async (sql, params = []) => {
   }
 
   // 19. Cancel Order
-  if (/SELECT buyer_id, order_status FROM `Order` WHERE order_id =/i.test(cleanSql)) {
+  if (/SELECT buyer_id, order_status FROM "Order" WHERE order_id =/i.test(cleanSql)) {
     const order_id = Number(params[0]);
     const o = orders.find(ord => ord.order_id === order_id);
     return [o ? [{ buyer_id: o.buyer_id, order_status: o.order_status }] : []];
   }
 
-  if (/UPDATE `Order` SET order_status = 'Cancelled' WHERE order_id =/i.test(cleanSql)) {
+  if (/UPDATE "Order" SET order_status = 'Cancelled' WHERE order_id =/i.test(cleanSql)) {
     const order_id = Number(params[0]);
     const o = orders.find(ord => ord.order_id === order_id);
     if (o) {
@@ -578,7 +571,7 @@ const query = async (sql, params = []) => {
   }
 
   // 20. Confirm & Deliver Orders
-  if (/SELECT o\.order_id FROM `Order` o JOIN Order_Item oi .* WHERE o\.order_id = \? AND l\.seller_id = \?/i.test(cleanSql)) {
+  if (/SELECT o\.order_id FROM "Order" o JOIN Order_Item oi .* WHERE o\.order_id = \? AND l\.seller_id = \?/i.test(cleanSql)) {
     const order_id = Number(params[0]);
     const seller_id = Number(params[1]);
     const oi = order_items.find(item => item.order_id === order_id);
@@ -589,14 +582,14 @@ const query = async (sql, params = []) => {
     return [[]];
   }
 
-  if (/UPDATE `Order` SET order_status = 'Confirmed' WHERE order_id =/i.test(cleanSql)) {
+  if (/UPDATE "Order" SET order_status = 'Confirmed' WHERE order_id =/i.test(cleanSql)) {
     const order_id = Number(params[0]);
     const o = orders.find(ord => ord.order_id === order_id);
     if (o && o.order_status !== 'Confirmed') { o.order_status = 'Confirmed'; notifyOrderStatus(o); }
     return [{ affectedRows: 1 }];
   }
 
-  if (/UPDATE `Order` SET order_status = 'Delivered' WHERE order_id =/i.test(cleanSql)) {
+  if (/UPDATE "Order" SET order_status = 'Delivered' WHERE order_id =/i.test(cleanSql)) {
     const order_id = Number(params[0]);
     const o = orders.find(ord => ord.order_id === order_id);
     if (o && o.order_status !== 'Delivered') { o.order_status = 'Delivered'; notifyOrderStatus(o); }
@@ -636,7 +629,7 @@ const query = async (sql, params = []) => {
   }
 
   // 23. Messages: Check order participants
-  if (/SELECT o\.buyer_id, l\.seller_id, o\.order_status(, oi\.quantity, i\.item_name.*)? FROM `Order` o/i.test(cleanSql)) {
+  if (/SELECT o\.buyer_id, l\.seller_id, o\.order_status(, oi\.quantity, i\.item_name.*)? FROM "Order" o/i.test(cleanSql)) {
     const order_id = Number(params[0]);
     const o = orders.find(ord => ord.order_id === order_id);
     if (!o) return [[]];
@@ -734,7 +727,7 @@ const query = async (sql, params = []) => {
   }
 
   // Checkout: create order
-  if (/^INSERT INTO `Order` \(buyer_id, order_status, total_amount\)/i.test(cleanSql)) {
+  if (/^INSERT INTO "Order" \(buyer_id, order_status, total_amount\)/i.test(cleanSql)) {
     const order_id = nextOrderId++;
     orders.push({ order_id, buyer_id: Number(params[0]), order_status: 'Placed', total_amount: Number(params[1]), created_at: new Date() });
     return [{ insertId: order_id, affectedRows: 1 }];
@@ -757,7 +750,7 @@ const query = async (sql, params = []) => {
   }
 
   // Reports: order participants
-  if (/^SELECT o\.buyer_id, l\.seller_id FROM `Order` o/i.test(cleanSql)) {
+  if (/^SELECT o\.buyer_id, l\.seller_id FROM "Order" o/i.test(cleanSql)) {
     const o = orders.find(ord => ord.order_id === Number(params[0]));
     if (!o) return [[]];
     const oi = order_items.find(item => item.order_id === o.order_id);
@@ -801,7 +794,7 @@ const query = async (sql, params = []) => {
 
   // ── Added with ratings / notifications / profile / listing edit ─────────
   // Student login (joins Floor for floor_number)
-  if (/FROM Student s JOIN Floor f ON s\.floor_id = f\.floor_id JOIN Hostel h ON s\.hostel_id = h\.hostel_id WHERE s\.email = \?/i.test(cleanSql)) {
+  if (/FROM Student s JOIN Floor f ON s\.floor_id = f\.floor_id JOIN Hostel h ON s\.hostel_id = h\.hostel_id WHERE lower\(s\.email\) = lower\(\?\)/i.test(cleanSql)) {
     const found = students.filter(s => s.email.toLowerCase() === String(params[0]).toLowerCase())
       .map(s => ({
         ...s,

@@ -16,7 +16,7 @@ router.get('/unread', auth, async (req, res) => {
       `SELECT m.order_id, COUNT(*) AS unread_count,
               MAX(sender.name) AS from_name, MAX(i.item_name) AS item_name
        FROM Message m
-       JOIN \`Order\`    o      ON m.order_id    = o.order_id
+       JOIN "Order"    o      ON m.order_id    = o.order_id
        JOIN Order_Item oi     ON o.order_id    = oi.order_id
        JOIN Listing    l      ON oi.listing_id = l.listing_id
        JOIN Item       i      ON l.item_id     = i.item_id
@@ -68,7 +68,7 @@ router.get('/:order_id', auth, async (req, res) => {
     const [orderRows] = await db.query(
       `SELECT o.buyer_id, l.seller_id, o.order_status, oi.quantity, i.item_name,
               buyer.name AS buyer_name, seller.name AS seller_name
-       FROM \`Order\` o
+       FROM "Order" o
        JOIN Order_Item oi     ON o.order_id    = oi.order_id
        JOIN Listing    l      ON oi.listing_id = l.listing_id
        JOIN Item       i      ON l.item_id     = i.item_id
@@ -134,7 +134,7 @@ router.post('/:order_id', auth, async (req, res) => {
     // Find the buyer and seller to determine the receiver
     const [orderRows] = await db.query(
       `SELECT o.buyer_id, l.seller_id, o.order_status
-       FROM \`Order\` o
+       FROM "Order" o
        JOIN Order_Item oi ON o.order_id    = oi.order_id
        JOIN Listing    l  ON oi.listing_id = l.listing_id
        WHERE o.order_id = ? LIMIT 1`,

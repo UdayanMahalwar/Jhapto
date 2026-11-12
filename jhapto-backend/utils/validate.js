@@ -4,7 +4,7 @@
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PHONE_RE = /^[6-9]\d{9}$/;               // Indian 10-digit mobile
 const UPLOAD_URL_RE = /^\/uploads\/([0-9a-f]{32}\.(png|jpg|gif|webp))$/;
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;       // 5 MB per uploaded image
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;       // 4 MB per image (Vercel caps request bodies at 4.5 MB)
 
 const isNonEmptyString = (v, max) =>
   typeof v === 'string' && v.trim().length > 0 && v.trim().length <= max;

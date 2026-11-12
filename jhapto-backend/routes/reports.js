@@ -28,7 +28,7 @@ router.post('/', auth, async (req, res) => {
     // Only the buyer and seller of this order can report each other
     const [orderRows] = await db.query(
       `SELECT o.buyer_id, l.seller_id
-       FROM \`Order\` o
+       FROM "Order" o
        JOIN Order_Item oi ON o.order_id    = oi.order_id
        JOIN Listing    l  ON oi.listing_id = l.listing_id
        WHERE o.order_id = ? LIMIT 1`,

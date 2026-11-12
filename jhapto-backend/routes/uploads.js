@@ -35,7 +35,7 @@ router.post('/', auth, uploadLimiter, (req, res) => {
   upload.single('image')(req, res, async (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(413).json({ message: 'Image must be under 5 MB.' });
+        return res.status(413).json({ message: 'Image must be under 4 MB.' });
       }
       return res.status(400).json({ message: 'Upload one image in a field named "image".' });
     }
