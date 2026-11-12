@@ -9,8 +9,8 @@ const app = express();
 
 // ── Middleware ───────────────────────────────────────────────
 app.use(cors());                  // allows React frontend to call this server
-app.use(express.json({ limit: '50mb' }));          // parses incoming JSON request bodies, 50mb limit for base64 images
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: '10mb' }));          // parses JSON bodies; 10mb leaves room for one base64 photo (validated to <5MB)
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // ── Routes ───────────────────────────────────────────────────
 app.use('/api/auth',     require('./routes/auth'));
@@ -19,6 +19,8 @@ app.use('/api/orders',   require('./routes/orders'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/admin',    require('./routes/admin'));
 app.use('/api/reports',  require('./routes/reports'));
+app.use('/api/reviews',  require('./routes/reviews'));
+app.use('/api/notifications', require('./routes/notifications'));
 
 // ── Health check ─────────────────────────────────────────────
 app.get('/', (req, res) => {
