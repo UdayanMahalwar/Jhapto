@@ -1,7 +1,8 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
 import api from '../utils/api';
+import { readAuthMessage, clearAuthMessage } from '../utils/authMessage';
 import './AuthPage.css';
 
 const AuthPage = () => {
@@ -9,7 +10,8 @@ const AuthPage = () => {
   const [formData, setFormData] = useState({
     name: '', email: '', phone_no: '', password: '', hostel_id: 1, floor_id: 1
   });
-  const [error, setError] = useState('');
+  const [error, setError] = useState(readAuthMessage);
+  useEffect(clearAuthMessage, []);
   
   const { loginUser } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -44,8 +46,8 @@ const AuthPage = () => {
         <form className="auth-form" onSubmit={handleSubmit}>
           {!isLogin && (
             <>
-              <input type="text" name="name" placeholder="Full Name" required onChange={handleChange} />
-              <input type="text" name="phone_no" placeholder="Phone Number" required onChange={handleChange} />
+              <input type="text" name="name" placeholder="Full Name" required maxLength={100} onChange={handleChange} />
+              <input type="tel" name="phone_no" placeholder="Phone Number (10 digits)" required pattern="[6-9][0-9]{9}" title="10-digit mobile number" maxLength={10} onChange={handleChange} />
               
               <div className="form-row">
                 <select name="hostel_id" onChange={handleChange} value={formData.hostel_id}>
@@ -64,7 +66,7 @@ const AuthPage = () => {
           )}
           
           <input type="email" name="email" placeholder="Email Address" required onChange={handleChange} />
-          <input type="password" name="password" placeholder="Password" required onChange={handleChange} />
+          <input type="password" name="password" placeholder={isLogin ? 'Password' : 'Password (min 6 characters)'} required minLength={isLogin ? undefined : 6} onChange={handleChange} />
           
           <button type="submit" className="auth-btn">
             {isLogin ? 'Login' : 'Register'}

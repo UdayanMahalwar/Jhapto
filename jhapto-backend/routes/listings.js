@@ -5,6 +5,7 @@ const express = require('express');
 const router  = express.Router();
 const db      = require('../config/db');
 const auth    = require('../middleware/auth');
+const v       = require('../utils/validate');
 
 // ── GET /api/listings ────────────────────────────────────────
 // Returns all active listings, floor-priority sorted
@@ -47,11 +48,26 @@ router.post('/', auth, async (req, res) => {
   const { item_id, mrp, selling_price, quantity_available, description, photo_url, room_number } = req.body;
   const seller_id = req.user.student_id;
 
-  console.log("POST /api/listings payload:", { item_id, mrp, selling_price, quantity_available, description, photo_url_length: photo_url?.length, room_number });
-
   if (!item_id || !mrp || !selling_price || !quantity_available || !room_number) {
-    console.log("Missing fields");
     return res.status(400).json({ message: 'item_id, mrp, selling_price, quantity, and room_number are required.' });
+  }
+  if (!v.isIntInRange(item_id, 1, 2147483647)) {
+    return res.status(400).json({ message: 'Choose an item from the list.' });
+  }
+  if (!v.isPrice(mrp) || !v.isPrice(selling_price)) {
+    return res.status(400).json({ message: 'MRP and selling price must be positive amounts (max 2 decimals, up to ₹1,00,000).' });
+  }
+  if (!v.isIntInRange(quantity_available, 1, 1000)) {
+    return res.status(400).json({ message: 'Quantity must be a whole number between 1 and 1000.' });
+  }
+  if (!v.isNonEmptyString(room_number, 50)) {
+    return res.status(400).json({ message: 'Room number must be 1–50 characters.' });
+  }
+  if (description != null && description !== '' && !v.isNonEmptyString(description, 500)) {
+    return res.status(400).json({ message: 'Description can be at most 500 characters.' });
+  }
+  if (!v.isOptionalImage(photo_url)) {
+    return res.status(400).json({ message: 'Photo must be a PNG, JPEG, GIF or WebP image under 5 MB.' });
   }
 
   try {
@@ -60,19 +76,18 @@ router.post('/', auth, async (req, res) => {
       'SELECT fn_is_price_valid(?, ?) AS valid', [mrp, selling_price]
     );
     if (!check[0].valid) {
-      console.log("Price invalid");
       return res.status(400).json({ message: 'Selling price cannot exceed 1.5x MRP.' });
     }
 
     await db.query(
       `INSERT INTO Listing (seller_id, item_id, mrp, selling_price, quantity_available, description, photo_url, room_number)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [seller_id, item_id, mrp, selling_price, quantity_available, description || null, photo_url || null, room_number]
+      [seller_id, item_id, mrp, selling_price, quantity_available,
+       description ? description.trim() : null, photo_url || null, room_number.trim()]
     );
 
     res.status(201).json({ message: 'Listing created successfully!' });
   } catch (err) {
-    console.error("DB Error:", err);
     // Catch trigger errors (e.g. duplicate active listing)
     if (err.sqlState === '45000') {
       return res.status(400).json({ message: err.message });
@@ -95,7 +110,7 @@ router.delete('/:id', auth, async (req, res) => {
     if (rows.length === 0) {
       return res.status(404).json({ message: 'Listing not found.' });
     }
-    if (rows[0].seller_id !== seller_id) {
+    if (Number(rows[0].seller_id) !== Number(seller_id)) {
       return res.status(403).json({ message: 'You can only remove your own listings.' });
     }
 
