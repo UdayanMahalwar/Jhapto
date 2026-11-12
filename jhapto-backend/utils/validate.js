@@ -3,9 +3,8 @@
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PHONE_RE = /^[6-9]\d{9}$/;               // Indian 10-digit mobile
-const IMAGE_DATA_URL_RE = /^data:image\/(png|jpe?g|gif|webp);base64,/i;
-
-const MAX_IMAGE_CHARS = 7 * 1024 * 1024;       // ~5 MB image once base64-encoded
+const UPLOAD_URL_RE = /^\/uploads\/([0-9a-f]{32}\.(png|jpg|gif|webp))$/;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;       // 5 MB per uploaded image
 
 const isNonEmptyString = (v, max) =>
   typeof v === 'string' && v.trim().length > 0 && v.trim().length <= max;
@@ -26,12 +25,15 @@ const isPrice = (v) => {
   return n > 0 && n <= 100000;
 };
 
-// Optional image: empty, a URL/path, or a base64 image data URL under the size cap
+// Optional image reference: empty, an image uploaded through POST /api/uploads
+// ("/uploads/<random>.<ext>", must exist on disk), or an http(s) URL.
+// Base64 data URLs are no longer accepted — images are stored as files.
 const isOptionalImage = (v) => {
   if (v === undefined || v === null || v === '') return true;
-  if (typeof v !== 'string' || v.length > MAX_IMAGE_CHARS) return false;
-  if (v.startsWith('data:')) return IMAGE_DATA_URL_RE.test(v);
-  return v.length <= 2048;
+  if (typeof v !== 'string' || v.length > 2048) return false;
+  const m = UPLOAD_URL_RE.exec(v);
+  if (m) return require('./uploadStore').existsSync(m[1]);
+  return /^https?:\/\/[^\s"'<>]+$/i.test(v);
 };
 
 const MIN_PASSWORD = 6;
@@ -39,5 +41,5 @@ const isPassword = (v) => typeof v === 'string' && v.length >= MIN_PASSWORD && v
 
 module.exports = {
   isNonEmptyString, isEmail, isPhone, isIntInRange, isPrice, isOptionalImage, isPassword,
-  MIN_PASSWORD,
+  MIN_PASSWORD, MAX_IMAGE_BYTES,
 };

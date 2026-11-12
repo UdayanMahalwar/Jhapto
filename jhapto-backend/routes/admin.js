@@ -8,7 +8,7 @@ const jwt     = require('jsonwebtoken');
 const db      = require('../config/db');
 const { loginLimiter } = require('../middleware/rateLimit');
 const v       = require('../utils/validate');
-require('dotenv').config();
+const realtime = require('../realtime');
 
 // ── Admin auth middleware (separate from student auth) ───────
 const adminAuth = (req, res, next) => {
@@ -133,6 +133,7 @@ router.patch('/students/:id/ban', adminAuth, async (req, res) => {
     await db.query(
       'UPDATE Student SET is_banned = TRUE WHERE student_id = ?', [req.params.id]
     );
+    realtime.disconnectUser(Number(req.params.id));
     res.json({ message: 'Student banned successfully.' });
   } catch (err) {
     res.status(500).json({ message: 'Error banning student.', error: err.message });

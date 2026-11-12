@@ -6,6 +6,7 @@ const router  = express.Router();
 const db      = require('../config/db');
 const auth    = require('../middleware/auth');
 const v       = require('../utils/validate');
+const realtime = require('../realtime');
 
 const MAX_QTY_PER_ITEM = 100;
 const MAX_CART_LINES   = 20;
@@ -73,6 +74,7 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ message: result.message || 'Order could not be placed.' });
     }
 
+    realtime.notifyOrderParties(result.order_id);
     res.status(201).json({
       message  : result.message,
       order_id : result.order_id,
@@ -139,6 +141,7 @@ router.post('/checkout', auth, async (req, res) => {
     }
 
     await conn.commit();
+    orderIds.forEach(id => realtime.notifyOrderParties(id));
     res.status(201).json({
       message  : orderIds.length === 1 ? 'Order placed successfully!' : `${orderIds.length} orders placed successfully!`,
       order_ids: orderIds,
@@ -266,6 +269,8 @@ router.patch('/:id/cancel', auth, async (req, res) => {
       "UPDATE `Order` SET order_status = 'Cancelled' WHERE order_id = ?", [order_id]
     );
 
+    realtime.emitToOrder(order_id, 'order:status', { order_id: Number(order_id), order_status: 'Cancelled' });
+    realtime.notifyOrderParties(order_id);
     res.json({ message: 'Order cancelled successfully.' });
   } catch (err) {
     if (err.sqlState === '45000') {
@@ -299,6 +304,8 @@ router.patch('/:id/confirm', auth, async (req, res) => {
       "UPDATE `Order` SET order_status = 'Confirmed' WHERE order_id = ?", [order_id]
     );
 
+    realtime.emitToOrder(order_id, 'order:status', { order_id: Number(order_id), order_status: 'Confirmed' });
+    realtime.notifyOrderParties(order_id);
     res.json({ message: 'Order confirmed!' });
   } catch (err) {
     res.status(500).json({ message: 'Error confirming order.', error: err.message });
@@ -328,6 +335,8 @@ router.patch('/:id/deliver', auth, async (req, res) => {
       "UPDATE `Order` SET order_status = 'Delivered' WHERE order_id = ?", [order_id]
     );
 
+    realtime.emitToOrder(order_id, 'order:status', { order_id: Number(order_id), order_status: 'Delivered' });
+    realtime.notifyOrderParties(order_id);
     res.json({ message: 'Order marked as delivered!' });
   } catch (err) {
     res.status(500).json({ message: 'Error updating order.', error: err.message });

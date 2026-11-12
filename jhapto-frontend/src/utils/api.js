@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { disconnectSocket } from './socket';
 
 const api = axios.create({
   baseURL: '/api',
@@ -27,6 +28,7 @@ api.interceptors.response.use(
     const hadToken = Boolean(error.config?.headers?.['Authorization']);
     if (hadToken && (code === 'INVALID_TOKEN' || code === 'ACCOUNT_BANNED')) {
       const wasAdmin = Boolean(localStorage.getItem('admin'));
+      disconnectSocket();
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('admin');

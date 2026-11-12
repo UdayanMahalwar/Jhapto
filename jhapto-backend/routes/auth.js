@@ -9,7 +9,6 @@ const db      = require('../config/db');
 const { loginLimiter, registerLimiter } = require('../middleware/rateLimit');
 const v       = require('../utils/validate');
 const auth    = require('../middleware/auth');
-require('dotenv').config();
 
 // ── POST /api/auth/register ──────────────────────────────────
 // Registers a new student
@@ -89,8 +88,10 @@ router.post('/login', loginLimiter, async (req, res) => {
   try {
     const [rows] = await db.query(
       `SELECT s.student_id, s.name, s.email, s.password_hash, s.floor_id, s.hostel_id, s.is_banned,
-              f.floor_number
-       FROM Student s JOIN Floor f ON s.floor_id = f.floor_id
+              f.floor_number, h.hostel_name
+       FROM Student s
+       JOIN Floor  f ON s.floor_id  = f.floor_id
+       JOIN Hostel h ON s.hostel_id = h.hostel_id
        WHERE s.email = ?`,
       [email.trim()]
     );
@@ -124,6 +125,7 @@ router.post('/login', loginLimiter, async (req, res) => {
         floor_id   : student.floor_id,
         floor_number: student.floor_number,
         hostel_id  : student.hostel_id,
+        hostel_name: student.hostel_name,
       }
     });
   } catch (err) {

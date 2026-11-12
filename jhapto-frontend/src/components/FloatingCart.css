@@ -96,3 +96,37 @@
   transform: translateX(5px);
   box-shadow: var(--neon-glow);
 }
+
+@media (max-width: 600px) {
+  .floating-cart-wrapper {
+    bottom: 0.75rem;
+    padding: 0 0.75rem;
+  }
+
+  .floating-cart {
+    padding: 0.6rem 0.6rem 0.6rem 0.9rem;
+    border-radius: 16px;
+  }
+
+  .cart-info {
+    gap: 0.75rem;
+  }
+
+  .cart-icon-wrapper {
+    width: 40px;
+    height: 40px;
+  }
+
+  .cart-label {
+    font-size: 0.7rem;
+  }
+
+  .cart-total {
+    font-size: 1.05rem;
+  }
+
+  .checkout-btn {
+    padding: 0.65rem 1rem;
+    font-size: 0.95rem;
+  }
+}

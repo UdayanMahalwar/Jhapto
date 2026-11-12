@@ -1,0 +1,6 @@
+{
+  "watch": ["server.js", "jhapto-backend"],
+  "ignore": ["jhapto-backend/uploads/**", "jhapto-backend/tests/**", "jhapto-backend/scripts/**", "jhapto-frontend/**"],
+  "ext": "js,json",
+  "delay": 300
+}
