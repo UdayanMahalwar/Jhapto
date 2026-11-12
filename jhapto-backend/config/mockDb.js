@@ -934,6 +934,7 @@ module.exports = {
   query,
   // Mirrors mysql2 pool.promise().getConnection(). Note: the mock has no real
   // transactions — rollback() does not undo writes made earlier in a checkout.
+  end: async () => {},
   getConnection: async () => ({
     query,
     beginTransaction: async () => {},

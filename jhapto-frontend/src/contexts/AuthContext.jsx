@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect } from 'react';
 import api from '../utils/api';
+import { disconnectSocket } from '../utils/socket';
 
 export const AuthContext = createContext();
 
@@ -23,6 +24,7 @@ export const AuthProvider = ({ children }) => {
 
   const loginUser = async (email, password) => {
     const res = await api.post('/auth/login', { email, password });
+    disconnectSocket();
     localStorage.setItem('token', res.data.token);
     localStorage.removeItem('admin');
     localStorage.setItem('user', JSON.stringify(res.data.student));
@@ -52,6 +54,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    disconnectSocket();
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('admin');

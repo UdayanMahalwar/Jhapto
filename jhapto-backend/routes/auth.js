@@ -9,7 +9,6 @@ const db      = require('../config/db');
 const { loginLimiter, registerLimiter } = require('../middleware/rateLimit');
 const v       = require('../utils/validate');
 const auth    = require('../middleware/auth');
-require('dotenv').config();
 
 // ── POST /api/auth/register ──────────────────────────────────
 // Registers a new student

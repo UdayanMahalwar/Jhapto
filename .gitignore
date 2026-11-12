@@ -12,3 +12,6 @@ node_modules/
 *.log
 !.env.example
 !**/.env.example
+
+# uploaded images (served from /uploads)
+jhapto-backend/uploads/

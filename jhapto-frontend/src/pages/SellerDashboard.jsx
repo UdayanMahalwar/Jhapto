@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { AuthContext } from '../contexts/AuthContext';
 import api from '../utils/api';
+import { uploadImage } from '../utils/upload';
 import OrderFilters from '../components/OrderFilters';
 import StarRating from '../components/StarRating';
 import { STATUSES_FOR_TAB, EMPTY_FILTERS, orderFilterParams } from '../utils/orderFilters';
@@ -21,6 +22,22 @@ const SellerDashboard = () => {
   const [orderFilters, setOrderFilters] = useState(EMPTY_FILTERS);
   const [editListing, setEditListing] = useState(null); // form state for the listing being edited
   const [editError, setEditError] = useState('');
+  const [uploading, setUploading] = useState(false);
+
+  // Uploads the picked image and passes its URL to onDone; clears the picker on failure
+  const pickImage = async (e, onDone, onError) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      onDone(await uploadImage(file));
+    } catch (err) {
+      e.target.value = '';
+      onError(err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
   
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -85,13 +102,9 @@ const SellerDashboard = () => {
     });
   };
 
-  const handleEditPhoto = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => setEditListing(prev => ({ ...prev, photo_url: reader.result }));
-    reader.readAsDataURL(file);
-  };
+  const handleEditPhoto = (e) => pickImage(e,
+    (url) => setEditListing(prev => ({ ...prev, photo_url: url })),
+    setEditError);
 
   const handleSaveEdit = async (e) => {
     e.preventDefault();
@@ -142,25 +155,11 @@ const SellerDashboard = () => {
     }
   };
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewListing({...newListing, photo_url: reader.result});
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+  const handleFileChange = (e) => pickImage(e,
+    (url) => setNewListing(prev => ({ ...prev, photo_url: url })),
+    (msg) => showNotification(msg, 'error'));
 
-  const handleReportFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setReportProof(reader.result);
-      reader.readAsDataURL(file);
-    }
-  };
+  const handleReportFileChange = (e) => pickImage(e, setReportProof, (msg) => alert(msg));
 
   const submitReport = async (e) => {
     e.preventDefault();
@@ -223,10 +222,11 @@ const SellerDashboard = () => {
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Product Photo (Take a picture or upload)</label>
-                <input type="file" accept="image/*" capture="environment" onChange={handleFileChange} style={{ padding: '0.8rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' }} />
+                <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" capture="environment" onChange={handleFileChange} style={{ padding: '0.8rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' }} />
+                {uploading && <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)' }}>Uploading…</span>}
               </div>
 
-              <button type="submit" className="auth-btn" style={{ marginTop: 0 }}>Add Listing</button>
+              <button type="submit" disabled={uploading} className="auth-btn" style={{ marginTop: 0, opacity: uploading ? 0.6 : 1 }}>Add Listing</button>
             </form>
           </div>
 
@@ -343,10 +343,11 @@ const SellerDashboard = () => {
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                 Replace photo (optional)
-                <input type="file" accept="image/*" onChange={handleEditPhoto} style={fieldStyle} />
+                <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" onChange={handleEditPhoto} style={fieldStyle} />
+                {uploading && <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)' }}>Uploading…</span>}
               </label>
               <div style={{ display: 'flex', gap: '1rem' }}>
-                <button type="submit" className="auth-btn" style={{ flex: 1, marginTop: 0 }}>Save changes</button>
+                <button type="submit" disabled={uploading} className="auth-btn" style={{ flex: 1, marginTop: 0, opacity: uploading ? 0.6 : 1 }}>Save changes</button>
                 <button type="button" onClick={() => setEditListing(null)} className="auth-btn" style={{ flex: 1, marginTop: 0, background: 'transparent', border: '1px solid var(--text-secondary)' }}>Cancel</button>
               </div>
             </form>
@@ -369,10 +370,11 @@ const SellerDashboard = () => {
               />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Attach Proof (Image)</label>
-                <input type="file" accept="image/*" onChange={handleReportFileChange} style={{ padding: '0.8rem', borderRadius: '12px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' }} />
+                <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" onChange={handleReportFileChange} style={{ padding: '0.8rem', borderRadius: '12px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' }} />
+                {uploading && <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)' }}>Uploading…</span>}
               </div>
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                <button type="submit" className="auth-btn" style={{ flex: 1, marginTop: 0, background: 'var(--secondary-color)' }}>Submit Report</button>
+                <button type="submit" disabled={uploading} className="auth-btn" style={{ flex: 1, marginTop: 0, background: 'var(--secondary-color)', opacity: uploading ? 0.6 : 1 }}>Submit Report</button>
                 <button type="button" onClick={() => { setReportModal({ show: false, order: null }); setReportReason(''); setReportProof(''); }} className="auth-btn" style={{ flex: 1, marginTop: 0, background: 'transparent', border: '1px solid var(--text-secondary)' }}>Cancel</button>
               </div>
             </form>

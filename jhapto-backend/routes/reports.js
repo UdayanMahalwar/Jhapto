@@ -21,7 +21,7 @@ router.post('/', auth, async (req, res) => {
     return res.status(400).json({ message: 'Reason must be 1–1000 characters.' });
   }
   if (!v.isOptionalImage(proof_url)) {
-    return res.status(400).json({ message: 'Proof must be a PNG, JPEG, GIF or WebP image under 5 MB.' });
+    return res.status(400).json({ message: 'Proof must be an image uploaded with the photo picker.' });
   }
 
   try {

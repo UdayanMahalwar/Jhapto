@@ -67,7 +67,7 @@ router.post('/', auth, async (req, res) => {
     return res.status(400).json({ message: 'Description can be at most 500 characters.' });
   }
   if (!v.isOptionalImage(photo_url)) {
-    return res.status(400).json({ message: 'Photo must be a PNG, JPEG, GIF or WebP image under 5 MB.' });
+    return res.status(400).json({ message: 'Photo must be an image uploaded with the photo picker.' });
   }
 
   try {
@@ -91,6 +91,9 @@ router.post('/', auth, async (req, res) => {
     // Catch trigger errors (e.g. duplicate active listing)
     if (err.sqlState === '45000') {
       return res.status(400).json({ message: err.message });
+    }
+    if (err.code === 'ER_NO_REFERENCED_ROW_2') {
+      return res.status(400).json({ message: 'Choose an item from the list.' });
     }
     res.status(500).json({ message: 'Error creating listing.', error: err.message });
   }
@@ -129,7 +132,7 @@ router.patch('/:id', auth, async (req, res) => {
     return res.status(400).json({ message: 'Description can be at most 500 characters.' });
   }
   if (photo_url !== undefined && !v.isOptionalImage(photo_url)) {
-    return res.status(400).json({ message: 'Photo must be a PNG, JPEG, GIF or WebP image under 5 MB.' });
+    return res.status(400).json({ message: 'Photo must be an image uploaded with the photo picker.' });
   }
 
   try {

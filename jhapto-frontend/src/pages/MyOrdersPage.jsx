@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { AuthContext } from '../contexts/AuthContext';
 import api from '../utils/api';
+import { uploadImage } from '../utils/upload';
 import OrderFilters from '../components/OrderFilters';
 import StarRating from '../components/StarRating';
 import { STATUSES_FOR_TAB, EMPTY_FILTERS, orderFilterParams } from '../utils/orderFilters';
@@ -19,6 +20,7 @@ const MyOrdersPage = () => {
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState('');
   const [reviewError, setReviewError] = useState('');
+  const [uploading, setUploading] = useState(false);
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
 
@@ -74,12 +76,17 @@ const MyOrdersPage = () => {
     }
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setReportProof(reader.result);
-      reader.readAsDataURL(file);
+    if (!file) return;
+    setUploading(true);
+    try {
+      setReportProof(await uploadImage(file));
+    } catch (err) {
+      e.target.value = '';
+      alert(err.message);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -215,10 +222,11 @@ const MyOrdersPage = () => {
               />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Attach Proof (Image)</label>
-                <input type="file" accept="image/*" onChange={handleFileChange} style={{ padding: '0.8rem', borderRadius: '12px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' }} />
+                <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" onChange={handleFileChange} style={{ padding: '0.8rem', borderRadius: '12px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' }} />
+                {uploading && <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)' }}>Uploading…</span>}
               </div>
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                <button type="submit" className="auth-btn" style={{ flex: 1, marginTop: 0, background: 'var(--secondary-color)' }}>Submit Report</button>
+                <button type="submit" disabled={uploading} className="auth-btn" style={{ flex: 1, marginTop: 0, background: 'var(--secondary-color)', opacity: uploading ? 0.6 : 1 }}>Submit Report</button>
                 <button type="button" onClick={() => { setReportModal({ show: false, order: null }); setReportReason(''); setReportProof(''); }} className="auth-btn" style={{ flex: 1, marginTop: 0, background: 'transparent', border: '1px solid var(--text-secondary)' }}>Cancel</button>
               </div>
             </form>
