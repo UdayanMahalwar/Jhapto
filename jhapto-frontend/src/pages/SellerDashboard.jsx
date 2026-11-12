@@ -3,6 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { AuthContext } from '../contexts/AuthContext';
 import api from '../utils/api';
+import OrderFilters from '../components/OrderFilters';
+import StarRating from '../components/StarRating';
+import { STATUSES_FOR_TAB, EMPTY_FILTERS, orderFilterParams } from '../utils/orderFilters';
+
+const fieldStyle = { padding: '0.8rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid var(--border-color)' };
 
 const SellerDashboard = () => {
   const [listings, setListings] = useState([]);
@@ -13,6 +18,9 @@ const SellerDashboard = () => {
   const [reportReason, setReportReason] = useState('');
   const [reportProof, setReportProof] = useState('');
   const [newListing, setNewListing] = useState({ item_id: '', mrp: '', selling_price: '', quantity_available: '', description: '', room_number: '' });
+  const [orderFilters, setOrderFilters] = useState(EMPTY_FILTERS);
+  const [editListing, setEditListing] = useState(null); // form state for the listing being edited
+  const [editError, setEditError] = useState('');
   
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -28,21 +36,75 @@ const SellerDashboard = () => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    fetchOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeOrderTab, orderFilters]);
+
   const fetchData = async () => {
     try {
-      const [listRes, ordRes, itemsRes] = await Promise.all([
+      const [listRes, itemsRes] = await Promise.all([
         api.get('/listings/my'),
-        api.get('/orders/selling'),
         api.get('/listings/items')
       ]);
       setListings(listRes.data);
-      setOrders(ordRes.data);
       setItems(itemsRes.data);
       if (itemsRes.data.length > 0) {
-        setNewListing(prev => ({ ...prev, item_id: itemsRes.data[0].item_id }));
+        setNewListing(prev => ({ ...prev, item_id: prev.item_id || itemsRes.data[0].item_id }));
       }
     } catch (err) {
       console.error('Error fetching seller data', err);
+    }
+  };
+
+  const fetchOrders = async () => {
+    try {
+      const res = await api.get('/orders/selling', { params: orderFilterParams(activeOrderTab, orderFilters) });
+      setOrders(res.data);
+    } catch (err) {
+      console.error('Error fetching orders', err);
+    }
+  };
+
+  const switchOrderTab = (tab) => {
+    setActiveOrderTab(tab);
+    setOrderFilters(EMPTY_FILTERS);
+  };
+
+  const openEdit = (l) => {
+    setEditError('');
+    setEditListing({
+      listing_id: l.listing_id,
+      item_name: l.item_name,
+      mrp: String(l.mrp),
+      selling_price: String(l.selling_price),
+      quantity_available: String(l.quantity_available),
+      description: l.description || '',
+      room_number: l.room_number || '',
+      photo_url: undefined, // unchanged unless a new photo is picked
+    });
+  };
+
+  const handleEditPhoto = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setEditListing(prev => ({ ...prev, photo_url: reader.result }));
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    setEditError('');
+    const { listing_id, item_name, photo_url, ...fields } = editListing;
+    if (photo_url !== undefined) fields.photo_url = photo_url;
+    try {
+      const res = await api.patch(`/listings/${listing_id}`, fields);
+      showNotification(res.data.listing_status === 'OutOfStock' ? 'Listing saved (out of stock)' : 'Listing updated');
+      setEditListing(null);
+      fetchData();
+    } catch (err) {
+      setEditError(err.response?.data?.message || 'Error updating listing');
     }
   };
 
@@ -73,6 +135,7 @@ const SellerDashboard = () => {
     try {
       await api.patch(`/orders/${order_id}/${action}`);
       showNotification(`Order ${action}ed!`);
+      fetchOrders();
       fetchData();
     } catch (err) {
       showNotification(err.response?.data?.message || `Error updating order`, 'error');
@@ -167,17 +230,24 @@ const SellerDashboard = () => {
             </form>
           </div>
 
-          <h3>My Active Listings</h3>
+          <h3>My Listings</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
             {listings.map(l => (
               <div key={l.listing_id} className="glass-panel" style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <h4>{l.item_name}</h4>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Price: ₹{l.selling_price} | Stock: {l.quantity_available} | Status: {l.listing_status}</p>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Price: ₹{l.selling_price} | Stock: {l.quantity_available} | Status: {l.listing_status}{l.room_number ? ` | Room ${l.room_number}` : ''}</p>
                 </div>
-                {l.listing_status === 'Active' && (
-                  <button onClick={() => handleDeleteListing(l.listing_id)} style={{ background: 'transparent', color: 'var(--secondary-color)', border: 'none', cursor: 'pointer' }}>Remove</button>
-                )}
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  {l.listing_status !== 'Removed' && (
+                    <button onClick={() => openEdit(l)} style={{ background: 'transparent', color: 'var(--primary-color)', border: 'none', cursor: 'pointer' }}>
+                      {l.listing_status === 'OutOfStock' ? 'Restock' : 'Edit'}
+                    </button>
+                  )}
+                  {l.listing_status === 'Active' && (
+                    <button onClick={() => handleDeleteListing(l.listing_id)} style={{ background: 'transparent', color: 'var(--secondary-color)', border: 'none', cursor: 'pointer' }}>Remove</button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -189,14 +259,14 @@ const SellerDashboard = () => {
 
           <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
             <button 
-              onClick={() => setActiveOrderTab('active')}
+              onClick={() => switchOrderTab('active')}
               className="auth-btn" 
               style={{ marginTop: 0, padding: '0.6rem 1rem', flex: 0, whiteSpace: 'nowrap', background: activeOrderTab === 'active' ? 'var(--primary-color)' : 'rgba(0,0,0,0.3)', color: activeOrderTab === 'active' ? '#000' : 'white', border: activeOrderTab === 'active' ? 'none' : '1px solid var(--border-color)' }}
             >
               Active Orders
             </button>
             <button 
-              onClick={() => setActiveOrderTab('history')}
+              onClick={() => switchOrderTab('history')}
               className="auth-btn" 
               style={{ marginTop: 0, padding: '0.6rem 1rem', flex: 0, whiteSpace: 'nowrap', background: activeOrderTab === 'history' ? 'var(--primary-color)' : 'rgba(0,0,0,0.3)', color: activeOrderTab === 'history' ? '#000' : 'white', border: activeOrderTab === 'history' ? 'none' : '1px solid var(--border-color)' }}
             >
@@ -204,20 +274,27 @@ const SellerDashboard = () => {
             </button>
           </div>
 
+          <OrderFilters value={orderFilters} onChange={setOrderFilters} statusOptions={STATUSES_FOR_TAB[activeOrderTab]} />
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {orders
-              .filter(o => activeOrderTab === 'active' ? ['Placed', 'Confirmed'].includes(o.order_status) : ['Delivered', 'Cancelled'].includes(o.order_status))
-              .map(o => (
+            {orders.map(o => (
               <div key={o.order_id} className="glass-panel" style={{ padding: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
                   <h4 style={{ color: 'var(--primary-color)' }}>Order #{o.order_id}</h4>
                   <span style={{ fontWeight: 'bold' }}>{o.order_status}</span>
                 </div>
                 <p style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>{new Date(o.created_at).toLocaleString()}</span><br />
                   Buyer: {o.buyer_name} ({o.buyer_phone})<br />
                   Item: {o.item_name} x{o.quantity}<br />
                   Total: ₹{o.total_amount}
                 </p>
+                {o.buyer_rating && (
+                  <div style={{ marginBottom: '1rem', fontSize: '0.85rem' }}>
+                    Buyer rated you: <StarRating value={o.buyer_rating} />
+                    {o.buyer_review && <div style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>"{o.buyer_review}"</div>}
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: '1rem' }}>
                   {o.order_status === 'Placed' && <button onClick={() => handleUpdateOrder(o.order_id, 'confirm')} className="auth-btn" style={{ flex: 1, marginTop: 0, padding: '0.5rem' }}>Confirm</button>}
                   {o.order_status === 'Confirmed' && <button onClick={() => handleUpdateOrder(o.order_id, 'deliver')} className="auth-btn" style={{ flex: 1, marginTop: 0, padding: '0.5rem', background: 'linear-gradient(90deg, #00b09b, #96c93d)' }}>Mark Delivered</button>}
@@ -228,13 +305,54 @@ const SellerDashboard = () => {
                 </div>
               </div>
             ))}
-            {orders.filter(o => activeOrderTab === 'active' ? ['Placed', 'Confirmed'].includes(o.order_status) : ['Delivered', 'Cancelled'].includes(o.order_status)).length === 0 && (
-              <p>No {activeOrderTab} orders found.</p>
+            {orders.length === 0 && (
+              <p>{orderFilters.status || orderFilters.from || orderFilters.to ? 'No orders match these filters.' : `No ${activeOrderTab} orders found.`}</p>
             )}
           </div>
         </div>
 
       </div>
+
+      {editListing && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+          <div className="glass-panel" style={{ padding: '2rem', width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3 style={{ marginBottom: '1rem' }}>Edit: {editListing.item_name}</h3>
+            {editError && <div className="auth-error" style={{ marginBottom: '1rem' }}>{editError}</div>}
+            <form onSubmit={handleSaveEdit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  MRP (₹)
+                  <input type="number" min="0.01" step="0.01" required value={editListing.mrp} onChange={(e) => setEditListing({ ...editListing, mrp: e.target.value })} style={fieldStyle} />
+                </label>
+                <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  Selling price (₹)
+                  <input type="number" min="0.01" step="0.01" required value={editListing.selling_price} onChange={(e) => setEditListing({ ...editListing, selling_price: e.target.value })} style={fieldStyle} />
+                </label>
+              </div>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Quantity available (0 = out of stock)
+                <input type="number" min="0" max="1000" step="1" required value={editListing.quantity_available} onChange={(e) => setEditListing({ ...editListing, quantity_available: e.target.value })} style={fieldStyle} />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Room number
+                <input type="text" required maxLength={50} value={editListing.room_number} onChange={(e) => setEditListing({ ...editListing, room_number: e.target.value })} style={fieldStyle} />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Description
+                <input type="text" maxLength={500} value={editListing.description} onChange={(e) => setEditListing({ ...editListing, description: e.target.value })} style={fieldStyle} />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Replace photo (optional)
+                <input type="file" accept="image/*" onChange={handleEditPhoto} style={fieldStyle} />
+              </label>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button type="submit" className="auth-btn" style={{ flex: 1, marginTop: 0 }}>Save changes</button>
+                <button type="button" onClick={() => setEditListing(null)} className="auth-btn" style={{ flex: 1, marginTop: 0, background: 'transparent', border: '1px solid var(--text-secondary)' }}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {reportModal.show && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>

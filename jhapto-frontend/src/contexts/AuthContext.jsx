@@ -42,6 +42,15 @@ export const AuthProvider = ({ children }) => {
     return res.data;
   };
 
+  // Merge changed profile fields (name, floor, ...) into the stored user
+  const updateUser = (fields) => {
+    setUser(prev => {
+      const next = { ...prev, ...fields };
+      localStorage.setItem('user', JSON.stringify(next));
+      return next;
+    });
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -51,7 +60,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, admin, loading, loginUser, loginAdmin, logout }}>
+    <AuthContext.Provider value={{ user, admin, loading, loginUser, loginAdmin, updateUser, logout }}>
       {!loading && children}
     </AuthContext.Provider>
   );

@@ -14,6 +14,7 @@ This repository contains the code for the Jhapto Quick Commerce platform, built 
 brew install mysql@8.4 && brew services start mysql@8.4   # macOS
 mysql -u root < jhapto-database/jhapto_database.sql
 mysql -u root < jhapto-database/jhapto_migrations.sql      # room_number, is_read, Report table, dev logins
+mysql -u root < jhapto-database/jhapto_migrations_v2.sql   # seller ratings/reviews, notifications
 mysql -u root -e "CREATE USER 'jhapto'@'localhost' IDENTIFIED BY 'jhapto_local'; GRANT ALL ON jhapto.* TO 'jhapto'@'localhost';"
 cp jhapto-backend/.env.example jhapto-backend/.env           # then set DB_PASSWORD
 ```
