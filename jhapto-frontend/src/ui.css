@@ -703,3 +703,26 @@ textarea.input {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── "Get the Android app" link ─────────────────────────────── */
+.app-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: var(--transition);
+}
+.app-download:hover { background: var(--primary-color); color: var(--on-primary); }
+.app-download:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+.auth-container { flex-direction: column; gap: 1.25rem; }
+.auth-app-download { position: relative; z-index: 1; background: var(--surface-glass); box-shadow: var(--shadow-sm); }
+
+.page-header-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
