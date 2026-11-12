@@ -1,9 +1,6 @@
 // utils/validate.js
 // Small input validators shared by the route handlers.
 
-const fs   = require('fs');
-const path = require('path');
-
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PHONE_RE = /^[6-9]\d{9}$/;               // Indian 10-digit mobile
 const UPLOAD_URL_RE = /^\/uploads\/([0-9a-f]{32}\.(png|jpg|gif|webp))$/;
@@ -35,7 +32,7 @@ const isOptionalImage = (v) => {
   if (v === undefined || v === null || v === '') return true;
   if (typeof v !== 'string' || v.length > 2048) return false;
   const m = UPLOAD_URL_RE.exec(v);
-  if (m) return fs.existsSync(path.join(process.env.UPLOAD_DIR, m[1]));
+  if (m) return require('./uploadStore').existsSync(m[1]);
   return /^https?:\/\/[^\s"'<>]+$/i.test(v);
 };
 
