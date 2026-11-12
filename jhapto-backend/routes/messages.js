@@ -5,6 +5,7 @@ const express = require('express');
 const router  = express.Router();
 const db      = require('../config/db');
 const auth    = require('../middleware/auth');
+const realtime = require('../realtime');
 
 // ── GET /api/messages/unread ─────────────────────────────
 // Fetch total count of unread messages for logged in user
@@ -134,13 +135,25 @@ router.post('/:order_id', auth, async (req, res) => {
     // Receiver is whoever is NOT the sender
     const receiver_id = Number(sender_id) === Number(buyer_id) ? seller_id : buyer_id;
 
-    await db.query(
+    const [result] = await db.query(
       `INSERT INTO Message (order_id, sender_id, receiver_id, message_text)
        VALUES (?, ?, ?, ?)`,
       [order_id, sender_id, receiver_id, message_text.trim()]
     );
 
-    res.status(201).json({ message: 'Message sent!' });
+    const message = {
+      message_id  : result.insertId,
+      order_id    : Number(order_id),
+      sender_id   : Number(sender_id),
+      sender_name : req.user.name,
+      message_text: message_text.trim(),
+      sent_at     : new Date().toISOString(),
+    };
+    // Live delivery to whoever has this chat open, and a badge update for the receiver
+    realtime.emitToOrder(order_id, 'message:new', message);
+    realtime.emitToUser(receiver_id, 'notifications:changed');
+
+    res.status(201).json({ message: 'Message sent!', data: message });
   } catch (err) {
     res.status(500).json({ message: 'Error sending message.', error: err.message });
   }

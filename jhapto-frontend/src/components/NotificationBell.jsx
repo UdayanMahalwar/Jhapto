@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, MessageCircle } from 'lucide-react';
 import api from '../utils/api';
+import { getSocket } from '../utils/socket';
 
-const POLL_MS = 15000;
+const POLL_MS = 60000;   // fallback only — updates are pushed over Socket.IO
 
 const timeAgo = (date) => {
   const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
@@ -36,7 +37,14 @@ const NotificationBell = () => {
   useEffect(() => {
     load();
     const interval = setInterval(load, POLL_MS);
-    return () => clearInterval(interval);
+    const socket = getSocket();
+    socket.on('notifications:changed', load);
+    socket.on('connect', load);          // catch up after a reconnect
+    return () => {
+      clearInterval(interval);
+      socket.off('notifications:changed', load);
+      socket.off('connect', load);
+    };
   }, []);
 
   // Close when clicking outside or pressing Escape

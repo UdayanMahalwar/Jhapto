@@ -8,6 +8,7 @@ const router  = express.Router();
 const db      = require('../config/db');
 const auth    = require('../middleware/auth');
 const v       = require('../utils/validate');
+const realtime = require('../realtime');
 
 // ── POST /api/reviews ────────────────────────────────────────
 // Body: { order_id, rating (1-5), comment? }
@@ -37,6 +38,7 @@ router.post('/', auth, async (req, res) => {
        VALUES (?, ?, 0, ?, ?)`,
       [order_id, reviewer_id, Number(rating), comment ? comment.trim() : null]
     );
+    realtime.notifyOrderParties(order_id);
     res.status(201).json({ message: 'Thanks for your review!' });
   } catch (err) {
     if (err.sqlState === '45000') {
