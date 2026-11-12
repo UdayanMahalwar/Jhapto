@@ -6,6 +6,18 @@ const router  = express.Router();
 const db      = require('../config/db');
 const auth    = require('../middleware/auth');
 const v       = require('../utils/validate');
+const { moderateListing } = require('../utils/moderation');
+
+// Catalogue details the moderation check needs
+async function itemDetails(item_id) {
+  const [rows] = await db.query(
+    `SELECT i.item_name, i.brand, c.category_name
+     FROM Item i JOIN Category c ON i.category_id = c.category_id
+     WHERE i.item_id = ?`,
+    [item_id]
+  );
+  return rows[0];
+}
 
 // ── GET /api/listings ────────────────────────────────────────
 // Returns all active listings, floor-priority sorted
@@ -79,6 +91,15 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ message: 'Selling price cannot exceed 1.5x MRP.' });
     }
 
+    // Prohibited-item check (keyword rules + AI review of the text and photo)
+    const item = await itemDetails(item_id);
+    if (!item) return res.status(400).json({ message: 'Choose an item from the list.' });
+    const verdict = await moderateListing({
+      itemName: item.item_name, brand: item.brand, category: item.category_name,
+      description, photoUrl: photo_url,
+    });
+    if (!verdict.allowed) return res.status(422).json({ message: verdict.message });
+
     await db.query(
       `INSERT INTO Listing (seller_id, item_id, mrp, selling_price, quantity_available, description, photo_url, room_number)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -137,7 +158,7 @@ router.patch('/:id', auth, async (req, res) => {
 
   try {
     const [rows] = await db.query(
-      `SELECT listing_id, seller_id, item_id, mrp, selling_price, listing_status
+      `SELECT listing_id, seller_id, item_id, mrp, selling_price, listing_status, description, photo_url
        FROM Listing WHERE listing_id = ?`,
       [req.params.id]
     );
@@ -155,6 +176,17 @@ router.patch('/:id', auth, async (req, res) => {
     const [check] = await db.query('SELECT fn_is_price_valid(?, ?) AS valid', [newMrp, newPrice]);
     if (!check[0].valid) {
       return res.status(400).json({ message: 'Selling price cannot exceed 1.5x MRP.' });
+    }
+
+    // Re-check for prohibited items when the description or photo changes
+    if (description !== undefined || photo_url !== undefined) {
+      const item = await itemDetails(listing.item_id);
+      const verdict = await moderateListing({
+        itemName: item.item_name, brand: item.brand, category: item.category_name,
+        description: description !== undefined ? description : listing.description,
+        photoUrl: photo_url !== undefined ? photo_url : listing.photo_url,
+      });
+      if (!verdict.allowed) return res.status(422).json({ message: verdict.message });
     }
 
     // Work out the status after the edit

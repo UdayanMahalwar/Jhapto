@@ -13,6 +13,7 @@
     "lint": "eslint jhapto-frontend/src"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
     "axios": "^1.15.2",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
