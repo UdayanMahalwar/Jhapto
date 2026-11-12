@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import api from '../utils/api';
 
 const AdminDashboard = () => {
@@ -16,6 +17,7 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('report');
   
   const { admin, logout } = useContext(AuthContext);
+  const toast = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -45,26 +47,29 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleRemoveListing = async (id) => {
+  const handleRemoveListing = async (listing) => {
+    if (!window.confirm(`Remove "${listing.item_name}" listed by ${listing.seller_name}?`)) return;
     try {
-      console.log('Removing listing:', id);
-      await api.delete(`/admin/listings/${id}`);
+      await api.delete(`/admin/listings/${listing.listing_id}`);
+      toast('Listing removed.');
       fetchData();
     } catch (err) {
-      console.error(err);
-      alert('Error removing listing');
+      toast(err.response?.data?.message || 'Error removing listing', 'error');
     }
   };
 
   const handleToggleBan = async (student) => {
     const action = student.is_banned ? 'unban' : 'ban';
+    const question = action === 'ban'
+      ? `Ban ${student.name}? They will be logged out immediately and their listings hidden.`
+      : `Unban ${student.name}?`;
+    if (!window.confirm(question)) return;
     try {
-      console.log(`Toggling ban for student ${student.student_id}, action: ${action}`);
       await api.patch(`/admin/students/${student.student_id}/${action}`);
+      toast(action === 'ban' ? `${student.name} banned.` : `${student.name} unbanned.`);
       fetchData();
     } catch (err) {
-      console.error(err);
-      alert(`Error trying to ${action} student`);
+      toast(err.response?.data?.message || `Error trying to ${action} student`, 'error');
     }
   };
 
@@ -73,7 +78,7 @@ const AdminDashboard = () => {
       await api.patch(`/admin/reports/${report_id}`, { status });
       fetchData();
     } catch (err) {
-      alert(err.response?.data?.message || 'Error updating report');
+      toast(err.response?.data?.message || 'Error updating report', 'error');
     }
   };
 
@@ -84,7 +89,7 @@ const AdminDashboard = () => {
       await api.patch(`/admin/students/${r.reported_user_id}/${action}`);
       fetchData();
     } catch (err) {
-      alert(err.response?.data?.message || `Error trying to ${action} student`);
+      toast(err.response?.data?.message || `Error trying to ${action} student`, 'error');
     }
   };
 
@@ -93,7 +98,7 @@ const AdminDashboard = () => {
       const res = await api.get(`/admin/reports/${report_id}/proof`);
       setProofModal({ report_id, url: res.data.proof_url });
     } catch (err) {
-      alert(err.response?.data?.message || 'Error loading proof');
+      toast(err.response?.data?.message || 'Error loading proof', 'error');
     }
   };
 
@@ -124,27 +129,30 @@ const AdminDashboard = () => {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-color)', color: 'white' }}>
-      <header className="glass-panel" style={{ padding: '1rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 0, borderTop: 0, borderLeft: 0, borderRight: 0 }}>
-        <h1 className="text-gradient" style={{ background: 'linear-gradient(90deg, #ff9a9e, #fecfef)' }}>JHAPTO ADMIN</h1>
+      <header className="glass-panel" style={{ padding: '1rem clamp(1rem, 4vw, 2rem)', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'space-between', alignItems: 'center', borderRadius: 0, borderTop: 0, borderLeft: 0, borderRight: 0 }}>
+        <h1 className="text-gradient" style={{ background: 'linear-gradient(90deg, #ff9a9e, #fecfef)', fontSize: 'clamp(1.4rem, 5vw, 2rem)' }}>JHAPTO ADMIN</h1>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <span style={{ fontWeight: 'bold' }}>{admin?.name || admin?.email}</span>
           <button onClick={handleLogout} className="auth-btn" style={{ padding: '0.5rem 1rem', marginTop: 0, background: 'transparent', border: '1px solid var(--secondary-color)', color: 'var(--secondary-color)' }}>Logout</button>
         </div>
       </header>
 
-      <div style={{ display: 'flex', padding: '2rem', gap: '2rem' }}>
-        <div className="glass-panel" style={{ width: '250px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', alignSelf: 'flex-start' }}>
+      <div className="admin-layout">
+        <nav className="glass-panel admin-sidebar" aria-label="Admin sections">
           <button onClick={() => setActiveTab('report')} style={{ padding: '1rem', background: activeTab==='report' ? 'rgba(255,255,255,0.1)' : 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', borderRadius: '8px' }}>Financial Report</button>
           <button onClick={() => setActiveTab('listings')} style={{ padding: '1rem', background: activeTab==='listings' ? 'rgba(255,255,255,0.1)' : 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', borderRadius: '8px' }}>Manage Listings</button>
           <button onClick={() => setActiveTab('students')} style={{ padding: '1rem', background: activeTab==='students' ? 'rgba(255,255,255,0.1)' : 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', borderRadius: '8px' }}>Manage Students</button>
           <button onClick={() => setActiveTab('userReports')} style={tabButtonStyle('userReports')}>User Reports</button>
           <button onClick={() => setActiveTab('admins')} style={tabButtonStyle('admins')}>Admins</button>
-        </div>
+        </nav>
 
-        <div className="glass-panel" style={{ flex: 1, padding: '2rem', overflowX: 'auto' }}>
+        <div className="glass-panel admin-content">
           {activeTab === 'report' && (
             <div>
-              <h2 style={{ marginBottom: '1rem' }}>Seller Revenue Report</h2>
+              <h2 style={{ marginBottom: '0.5rem' }}>Seller Revenue Report</h2>
+              <p style={{ marginBottom: '1rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Earned = delivered orders. Pending = placed or confirmed, not yet delivered.
+              </p>
               <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
@@ -152,17 +160,22 @@ const AdminDashboard = () => {
                     <th style={{ padding: '1rem' }}>Floor</th>
                     <th style={{ padding: '1rem' }}>Listings</th>
                     <th style={{ padding: '1rem' }}>Orders Bought</th>
-                    <th style={{ padding: '1rem' }}>Total Revenue</th>
+                    <th style={{ padding: '1rem' }}>Earned</th>
+                    <th style={{ padding: '1rem' }}>Pending</th>
                   </tr>
                 </thead>
                 <tbody>
                   {report.map(r => (
                     <tr key={r.student_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <td style={{ padding: '1rem' }}>{r.student_name}</td>
+                      <td style={{ padding: '1rem' }}>
+                        {r.student_name}
+                        {Boolean(r.is_banned) && <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: 'var(--secondary-color)' }}>Banned</span>}
+                      </td>
                       <td style={{ padding: '1rem' }}>{r.floor_number}</td>
                       <td style={{ padding: '1rem' }}>{r.total_listings}</td>
                       <td style={{ padding: '1rem' }}>{r.total_orders}</td>
                       <td style={{ padding: '1rem', color: 'var(--primary-color)', fontWeight: 'bold' }}>₹{r.total_revenue}</td>
+                      <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>₹{r.pending_revenue ?? '0.00'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -195,7 +208,7 @@ const AdminDashboard = () => {
                       <td style={{ padding: '1rem' }}>{l.listing_status}</td>
                       <td style={{ padding: '1rem' }}>
                         {l.listing_status !== 'Removed' && (
-                          <button onClick={() => handleRemoveListing(l.listing_id)} style={{ padding: '0.4rem 0.8rem', background: 'var(--secondary-color)', border: 'none', color: 'white', borderRadius: '4px', cursor: 'pointer' }}>Remove</button>
+                          <button onClick={() => handleRemoveListing(l)} style={{ padding: '0.4rem 0.8rem', background: 'var(--secondary-color)', border: 'none', color: 'white', borderRadius: '4px', cursor: 'pointer' }}>Remove</button>
                         )}
                       </td>
                     </tr>

@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
 import api from '../utils/api';
 import { readAuthMessage, clearAuthMessage } from '../utils/authMessage';
@@ -11,9 +11,10 @@ const AuthPage = () => {
     name: '', email: '', phone_no: '', password: '', hostel_id: 1, floor_id: 1
   });
   const [error, setError] = useState(readAuthMessage);
+  const [success, setSuccess] = useState('');
   useEffect(clearAuthMessage, []);
   
-  const { loginUser } = useContext(AuthContext);
+  const { loginUser, user } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const handleChange = (e) => setFormData({...formData, [e.target.name]: e.target.value});
@@ -21,13 +22,14 @@ const AuthPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
     try {
       if (isLogin) {
         await loginUser(formData.email, formData.password);
         navigate('/');
       } else {
         await api.post('/auth/register', formData);
-        alert('Registration successful! Please login.');
+        setSuccess('Account created! Log in with your email and password.');
         setIsLogin(true);
       }
     } catch (err) {
@@ -35,13 +37,16 @@ const AuthPage = () => {
     }
   };
 
+  if (user) return <Navigate to="/" replace />;
+
   return (
     <div className="auth-container">
       <div className="auth-card glass-panel">
         <h2 className="text-gradient auth-title">JHAPTO</h2>
         <h3 className="auth-subtitle">{isLogin ? 'Welcome Back' : 'Create an Account'}</h3>
         
-        {error && <div className="auth-error">{error}</div>}
+        {error && <div className="auth-error" role="alert">{error}</div>}
+        {success && <div className="auth-error" role="status" style={{ background: 'rgba(46, 204, 113, 0.2)', color: '#2ecc71', border: '1px solid #2ecc71' }}>{success}</div>}
         
         <form className="auth-form" onSubmit={handleSubmit}>
           {!isLogin && (
@@ -75,7 +80,7 @@ const AuthPage = () => {
         
         <p className="auth-switch">
           {isLogin ? "Don't have an account? " : "Already have an account? "}
-          <span onClick={() => setIsLogin(!isLogin)} className="text-gradient" style={{cursor: 'pointer'}}>
+          <span onClick={() => { setIsLogin(!isLogin); setError(''); setSuccess(''); }} className="text-gradient" style={{cursor: 'pointer'}}>
             {isLogin ? 'Register' : 'Login'}
           </span>
         </p>

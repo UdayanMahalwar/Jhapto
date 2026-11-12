@@ -13,6 +13,7 @@ const ChatPage = () => {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [live, setLive] = useState(false);
+  const [blocked, setBlocked] = useState('');   // set when this chat isn't yours / doesn't exist
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
   const listRef = useRef(null);
@@ -25,12 +26,15 @@ const ChatPage = () => {
       setOrderStatus(res.data.order_status);
       setError('');
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not load messages.');
+      const status = err.response?.status;
+      if (status === 403 || status === 404) setBlocked(err.response.data?.message || 'This chat is not available.');
+      else setError(err.response?.data?.message || 'Could not load messages.');
     }
   }, [order_id]);
 
   // Live updates over Socket.IO
   useEffect(() => {
+    if (blocked) return undefined;
     fetchMessages();
     const socket = getSocket();
 
@@ -69,7 +73,7 @@ const ChatPage = () => {
       socket.off('message:new', onMessage);
       socket.off('order:status', onStatus);
     };
-  }, [order_id, fetchMessages, user.student_id]);
+  }, [order_id, fetchMessages, user.student_id, blocked]);
 
   // Keep the newest message in view
   useEffect(() => {
@@ -93,9 +97,24 @@ const ChatPage = () => {
     }
   };
 
+  if (blocked) {
+    return (
+      <>
+        <Header user={user} onLogout={logout} onOrdersClick={() => navigate('/orders')} onSellerClick={() => navigate('/seller')} />
+        <div style={{ padding: '2rem 1rem', maxWidth: '800px', margin: '0 auto' }}>
+          <h2 className="text-gradient" style={{ marginBottom: '1rem' }}>Chat - Order #{order_id}</h2>
+          <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
+            <p style={{ marginBottom: '1rem' }}>{blocked}</p>
+            <button className="auth-btn" style={{ marginTop: 0, padding: '0.6rem 1.5rem' }} onClick={() => navigate('/orders')}>Go to my orders</button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
-      <Header cartCount={0} user={user} onLogout={logout} onOrdersClick={() => navigate('/orders')} onSellerClick={() => navigate('/seller')} />
+      <Header user={user} onLogout={logout} onOrdersClick={() => navigate('/orders')} onSellerClick={() => navigate('/seller')} />
       <div style={{ padding: '2rem 1rem', maxWidth: '800px', margin: '0 auto', height: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1rem', gap: '1rem' }}>
           <h2 className="text-gradient">Chat - Order #{order_id}</h2>
@@ -159,4 +178,10 @@ const ChatPage = () => {
   );
 };
 
-export default ChatPage;
+// Remount per order so state (messages, "not available", live status) never leaks between chats
+const ChatRoute = () => {
+  const { order_id } = useParams();
+  return <ChatPage key={order_id} />;
+};
+
+export default ChatRoute;

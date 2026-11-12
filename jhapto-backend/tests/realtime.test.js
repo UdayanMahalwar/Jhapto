@@ -80,6 +80,18 @@ test('status changes are pushed to the chat (unlocks it on confirm)', async () =
   await notif;
 });
 
+test('reading a chat tells the reader\'s other tabs to refresh their badge', async () => {
+  // Seed order 3: Priya (buyer) <-> Sneha (seller). Sneha sends, Priya reads in another tab.
+  const priya = await login('priya');
+  const otherTab = await open(priya);
+  const arrived = next(otherTab, 'notifications:changed');   // badge update for the new message
+  await api().post('/api/messages/3').set(bearer(await login('sneha'))).send({ message_text: 'ping' }).expect(201);
+  await arrived;
+  const refreshed = next(otherTab, 'notifications:changed');  // must come from the read below
+  await api().get('/api/messages/3').set(bearer(priya)).expect(200);
+  await refreshed;
+});
+
 test('banning a student drops their live connection', async () => {
   const socket = await open(await login('rohan'));
   const dropped = next(socket, 'disconnect');

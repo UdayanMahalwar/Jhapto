@@ -232,6 +232,19 @@ router.delete('/:id', auth, async (req, res) => {
   }
 });
 
+// ── GET /api/listings/categories ─────────────────────────────
+// Category filter bar on the home page
+router.get('/categories', auth, async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      'SELECT category_id, category_name FROM Category ORDER BY category_id'
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ message: 'Error fetching categories.', error: err.message });
+  }
+});
+
 // ── GET /api/listings/items ──────────────────────────────────
 // Returns all items (for the "sell an item" dropdown)
 router.get('/items', auth, async (req, res) => {

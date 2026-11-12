@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Header from '../components/Header';
 import { AuthContext } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import api from '../utils/api';
 import { uploadImage } from '../utils/upload';
 import OrderFilters from '../components/OrderFilters';
@@ -10,7 +11,10 @@ import { STATUSES_FOR_TAB, EMPTY_FILTERS, orderFilterParams } from '../utils/ord
 
 const MyOrdersPage = () => {
   const [orders, setOrders] = useState([]);
-  const [activeTab, setActiveTab] = useState('active'); // 'active' or 'history'
+  // Tab lives in the URL (?tab=history) so notifications can link straight to it
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') === 'history' ? 'history' : 'active';
+  const toast = useToast();
   const [reportModal, setReportModal] = useState({ show: false, order: null });
   const [reportReason, setReportReason] = useState('');
   const [reportProof, setReportProof] = useState('');
@@ -42,7 +46,7 @@ const MyOrdersPage = () => {
   };
 
   const switchTab = (tab) => {
-    setActiveTab(tab);
+    setSearchParams(tab === 'history' ? { tab: 'history' } : {}, { replace: true });
     setFilters(EMPTY_FILTERS);
   };
 
@@ -69,10 +73,10 @@ const MyOrdersPage = () => {
     if (!window.confirm('Are you sure you want to cancel this order?')) return;
     try {
       await api.patch(`/orders/${order_id}/cancel`);
-      alert('Order cancelled');
+      toast('Order cancelled');
       fetchOrders();
     } catch (err) {
-      alert(err.response?.data?.message || 'Error cancelling order');
+      toast(err.response?.data?.message || 'Error cancelling order', 'error');
     }
   };
 
@@ -84,7 +88,7 @@ const MyOrdersPage = () => {
       setReportProof(await uploadImage(file));
     } catch (err) {
       e.target.value = '';
-      alert(err.message);
+      toast(err.message, 'error');
     } finally {
       setUploading(false);
     }
@@ -92,7 +96,7 @@ const MyOrdersPage = () => {
 
   const submitReport = async (e) => {
     e.preventDefault();
-    if (!reportReason) return alert('Reason is required');
+    if (!reportReason) return toast('Reason is required', 'error');
     try {
       await api.post('/reports', {
         order_id: reportModal.order.order_id,
@@ -100,22 +104,22 @@ const MyOrdersPage = () => {
         reason: reportReason,
         proof_url: reportProof
       });
-      alert('Report submitted successfully!');
+      toast('Report submitted. Admins will review it.');
       setReportModal({ show: false, order: null });
       setReportReason('');
       setReportProof('');
     } catch (err) {
-      alert(err.response?.data?.message || 'Error submitting report');
+      toast(err.response?.data?.message || 'Error submitting report', 'error');
     }
   };
 
   return (
     <>
-      <Header cartCount={0} user={user} onLogout={logout} onOrdersClick={() => navigate('/orders')} onSellerClick={() => navigate('/seller')} />
-      <div className="orders-container" style={{ padding: '2rem', maxWidth: '1000px', margin: '0 auto' }}>
+      <Header user={user} onLogout={logout} onOrdersClick={() => navigate('/orders')} onSellerClick={() => navigate('/seller')} />
+      <div className="orders-container" style={{ padding: '2rem clamp(1rem, 4vw, 2rem)', width: '100%', maxWidth: '1000px', margin: '0 auto' }}>
         <h2 className="text-gradient">My Orders</h2>
         
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.5rem' }}>
           <button 
             onClick={() => switchTab('active')}
             className="auth-btn" 

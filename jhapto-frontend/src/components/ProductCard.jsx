@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Plus, Minus } from 'lucide-react';
 import StarRating from './StarRating';
 import './ProductCard.css';
 
 const ProductCard = ({ product, onAdd, onRemove, cartQuantity, isOwn = false }) => {
+  const [imageFailed, setImageFailed] = useState(false);
   return (
     <div className="product-card glass-panel">
       <div className="product-priority">
@@ -15,11 +16,13 @@ const ProductCard = ({ product, onAdd, onRemove, cartQuantity, isOwn = false }) 
       </div>
       
       <div className="product-image-container">
-        {product.photo_url ? (
-          <img 
-            src={product.photo_url} 
-            alt={product.item_name} 
-            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '12px' }} 
+        {product.photo_url && !imageFailed ? (
+          <img
+            src={product.photo_url}
+            alt={product.item_name}
+            loading="lazy"
+            onError={() => setImageFailed(true)}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '12px' }}
           />
         ) : (
           <div className="product-image-placeholder">

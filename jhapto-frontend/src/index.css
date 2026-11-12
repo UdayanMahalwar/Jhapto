@@ -63,3 +63,71 @@ body {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* Seller dashboard: two columns on wide screens, stacked on phones/tablets */
+.seller-grid {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.seller-grid > * {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .seller-grid {
+    grid-template-columns: 1fr;
+    padding: 1.25rem 1rem;
+  }
+}
+
+/* Admin dashboard: sidebar on the left, tabs across the top on small screens */
+.admin-layout {
+  display: flex;
+  padding: 2rem;
+  gap: 2rem;
+}
+
+.admin-sidebar {
+  width: 250px;
+  flex-shrink: 0;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-self: flex-start;
+}
+
+.admin-content {
+  flex: 1;
+  min-width: 0;
+  padding: 2rem;
+  overflow-x: auto;
+}
+
+@media (max-width: 800px) {
+  .admin-layout {
+    flex-direction: column;
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .admin-sidebar {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .admin-sidebar button {
+    white-space: nowrap;
+    padding: 0.6rem 0.9rem !important;
+  }
+
+  .admin-content {
+    padding: 1rem;
+  }
+}

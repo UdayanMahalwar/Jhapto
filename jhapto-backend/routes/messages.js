@@ -8,20 +8,31 @@ const auth    = require('../middleware/auth');
 const realtime = require('../realtime');
 
 // ── GET /api/messages/unread ─────────────────────────────
-// Fetch total count of unread messages for logged in user
+// Unread chat messages for the logged-in student: total + one entry per chat
 router.get('/unread', auth, async (req, res) => {
   const student_id = req.user.student_id;
   try {
-    const [[{ unread_count }]] = await db.query(
-      `SELECT COUNT(*) AS unread_count
+    const [chats] = await db.query(
+      `SELECT m.order_id, COUNT(*) AS unread_count,
+              MAX(sender.name) AS from_name, MAX(i.item_name) AS item_name
        FROM Message m
-       JOIN \`Order\` o ON m.order_id = o.order_id
-       WHERE m.receiver_id = ? 
-         AND m.is_read = FALSE 
-         AND o.order_status IN ('Placed', 'Confirmed')`,
+       JOIN \`Order\`    o      ON m.order_id    = o.order_id
+       JOIN Order_Item oi     ON o.order_id    = oi.order_id
+       JOIN Listing    l      ON oi.listing_id = l.listing_id
+       JOIN Item       i      ON l.item_id     = i.item_id
+       JOIN Student    sender ON m.sender_id   = sender.student_id
+       WHERE m.receiver_id = ?
+         AND m.is_read = FALSE
+         AND o.order_status IN ('Placed', 'Confirmed')
+       GROUP BY m.order_id
+       ORDER BY MAX(m.sent_at) DESC`,
       [student_id]
     );
-    res.json({ unread_count });
+    const normalized = chats.map(c => ({ ...c, unread_count: Number(c.unread_count) }));
+    res.json({
+      unread_count: normalized.reduce((sum, c) => sum + c.unread_count, 0),
+      chats: normalized,
+    });
   } catch (err) {
     res.status(500).json({ message: 'Error fetching unread count.', error: err.message });
   }
@@ -33,11 +44,13 @@ router.patch('/:order_id/read', auth, async (req, res) => {
   const order_id = req.params.order_id;
   const student_id = req.user.student_id;
   try {
-    await db.query(
+    const [result] = await db.query(
       `UPDATE Message SET is_read = TRUE
        WHERE order_id = ? AND receiver_id = ? AND is_read = FALSE`,
       [order_id, student_id]
     );
+    // the reader's unread badge (in every open tab) should drop right away
+    if (result.affectedRows > 0) realtime.emitToUser(student_id, 'notifications:changed');
     res.json({ message: 'Messages marked as read.' });
   } catch (err) {
     res.status(500).json({ message: 'Error marking messages as read.', error: err.message });
@@ -71,11 +84,12 @@ router.get('/:order_id', auth, async (req, res) => {
     }
 
     // Mark messages as read since the user is viewing the chat
-    await db.query(
+    const [readResult] = await db.query(
       `UPDATE Message SET is_read = TRUE
        WHERE order_id = ? AND receiver_id = ? AND is_read = FALSE`,
       [order_id, student_id]
     );
+    if (readResult.affectedRows > 0) realtime.emitToUser(student_id, 'notifications:changed');
 
     const [messages] = await db.query(
       `SELECT m.message_id, m.sender_id, s.name AS sender_name,
