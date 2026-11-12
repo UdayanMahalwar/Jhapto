@@ -1,91 +1,103 @@
-.category-section {
-  max-width: 1200px;
-  margin: 0 auto 3rem auto;
-  padding: 0 2rem;
-}
-
-.section-title {
-  font-size: 1.5rem;
-  margin-bottom: 1.5rem;
-  font-weight: 700;
-}
-
 .category-list {
   display: flex;
-  gap: 1.5rem;
+  gap: 0.6rem;
   overflow-x: auto;
-  padding-bottom: 1rem;
-  scrollbar-width: none; /* Firefox */
+  padding: 0.25rem 0.1rem 0.75rem;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
 }
 
 .category-list::-webkit-scrollbar {
-  display: none; /* Chrome/Safari */
+  display: none;
 }
 
-.category-card {
-  min-width: 120px;
+.category-chip {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 1.05rem 0.4rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--surface-color);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.92rem;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  scroll-snap-align: start;
+  transition: color 0.25s, box-shadow 0.25s;
+}
+
+.category-chip:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.category-chip.active {
+  color: var(--on-primary);
+  border-color: transparent;
+}
+
+.category-pill {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--primary-color);
+  z-index: 0;
+}
+
+.category-emoji {
+  position: relative;
+  z-index: 1;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem 1rem;
-  cursor: pointer;
-  transition: var(--transition);
+  font-size: 1.15rem;
+  background: var(--input-bg);
+  transition: background 0.25s;
 }
 
-.category-card:hover {
-  transform: translateY(-5px);
-  border-color: var(--primary-color);
-  background: rgba(69, 243, 255, 0.05);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+.category-emoji.saved {
+  color: var(--secondary-color);
 }
 
-.category-icon {
-  font-size: 2.5rem;
-  margin-bottom: 0.5rem;
-  transition: var(--transition);
+.category-chip.active .category-emoji {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
 }
 
-.category-card:hover .category-icon {
-  transform: scale(1.1);
-}
-
-.category-name {
-  font-weight: 600;
-  font-size: 0.9rem;
+.category-label,
+.category-count {
+  position: relative;
+  z-index: 1;
   white-space: nowrap;
 }
 
-.category-card {
-  border-radius: var(--radius);
+@media (max-width: 720px) {
+  .category-chip {
+    font-size: 0.85rem;
+    padding: 0.3rem 0.85rem 0.3rem 0.3rem;
+    gap: 0.4rem;
+  }
+
+  .category-emoji {
+    width: 28px;
+    height: 28px;
+    font-size: 0.95rem;
+  }
 }
 
-@media (max-width: 768px) {
-  .category-section {
-    padding: 0 1rem;
-    margin-bottom: 1.75rem;
-  }
+.category-count {
+  font-size: 0.72rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: var(--surface-3);
+}
 
-  .category-list {
-    gap: 0.6rem;
-    padding-bottom: 0.25rem;
-  }
-
-  .category-card {
-    min-width: 0;
-    flex-shrink: 0;
-    flex-direction: row;
-    gap: 0.45rem;
-    padding: 0.55rem 0.9rem;
-    border-radius: 999px;
-  }
-
-  .category-icon {
-    font-size: 1.15rem;
-    margin: 0;
-  }
-
-  .category-card:hover {
-    transform: none;
-  }
+.category-chip.active .category-count {
+  background: rgba(255, 255, 255, 0.25);
 }
