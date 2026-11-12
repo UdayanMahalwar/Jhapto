@@ -10,17 +10,13 @@
 require('../config/env');
 const mysql = require('mysql2/promise');
 const { buildDatabase } = require('./lib/sqlRunner');
+const { connectionOptions } = require('../config/dbOptions');
 
 async function main() {
   const reset = process.argv.includes('--reset');
   const dbName = process.env.DB_NAME || 'jhapto';
 
-  const conn = await mysql.createConnection({
-    host    : process.env.DB_HOST || 'localhost',
-    port    : Number(process.env.DB_PORT) || 3306,
-    user    : process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-  });
+  const conn = await mysql.createConnection(connectionOptions({ database: false }));
 
   try {
     const [rows] = await conn.query('SHOW DATABASES LIKE ?', [dbName]);

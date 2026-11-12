@@ -49,5 +49,8 @@
     ],
     "transform": {},
     "testTimeout": 20000
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
