@@ -1,0 +1,38 @@
+# Render Blueprint — free web service for Jhapto.
+# The MySQL database is hosted separately (Aiven free tier); fill in the DB_*
+# values marked `sync: false` in the Render dashboard when creating the service.
+services:
+  - type: web
+    name: jhapto
+    runtime: node
+    plan: free
+    region: singapore
+    branch: main
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY          # Render sits in front of the app; use the real client IP
+        value: "1"
+      - key: UPLOAD_STORAGE       # free instances have no persistent disk → keep images in MySQL
+        value: db
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DB_NAME
+        value: jhapto
+      - key: DB_POOL_SIZE
+        value: "5"
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_SSL_CA            # Aiven's CA certificate (PEM text)
+        sync: false

@@ -12,6 +12,7 @@ const path   = require('path');
 const crypto = require('crypto');
 const mysql  = require('mysql2/promise');
 const { sniffImageType } = require('../utils/imageType');
+const { connectionOptions } = require('../config/dbOptions');
 
 const TARGETS = [
   { table: 'Listing', id: 'listing_id', column: 'photo_url' },
@@ -20,13 +21,7 @@ const TARGETS = [
 
 async function main() {
   const apply = process.argv.includes('--apply');
-  const conn = await mysql.createConnection({
-    host    : process.env.DB_HOST || 'localhost',
-    port    : Number(process.env.DB_PORT) || 3306,
-    user    : process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'jhapto',
-  });
+  const conn = await mysql.createConnection(connectionOptions());
 
   let moved = 0, skipped = 0;
   try {
