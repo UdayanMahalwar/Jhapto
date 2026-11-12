@@ -31,6 +31,16 @@ async function load(name) {
   return rows[0] || null;
 }
 
+// Raw bytes of an upload (either storage mode), or null if it's missing
+async function read(name) {
+  if (usesDatabase()) return (await load(name))?.data || null;
+  try {
+    return await fs.promises.readFile(path.join(process.env.UPLOAD_DIR, name));
+  } catch {
+    return null;
+  }
+}
+
 // Synchronous existence check used by input validation. In database mode the
 // name format is checked by the caller; a missing row just shows the placeholder.
 function existsSync(name) {
@@ -38,4 +48,4 @@ function existsSync(name) {
   return fs.existsSync(path.join(process.env.UPLOAD_DIR, name));
 }
 
-module.exports = { save, load, existsSync, usesDatabase, MIME };
+module.exports = { save, load, read, existsSync, usesDatabase, MIME };

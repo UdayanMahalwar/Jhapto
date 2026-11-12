@@ -14,3 +14,6 @@ process.env.UPLOAD_DIR          = path.join(os.tmpdir(), 'jhapto-test-uploads');
 if (!/_test$/.test(process.env.DB_NAME)) {
   throw new Error(`Refusing to run tests against "${process.env.DB_NAME}" — the name must end in _test.`);
 }
+
+// Never call the real Claude API from tests (moderation.test.js uses a fake client)
+process.env.AI_MODERATION = 'off';

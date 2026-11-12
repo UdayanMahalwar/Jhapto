@@ -43,6 +43,12 @@ The original MySQL scripts (`jhapto-database/jhapto_database.sql` + migrations v
   `DB_POOL_SIZE=3`, and `VITE_REALTIME=false` (Vercel has no WebSockets, so chat and notifications refresh every few seconds instead of instantly).
 * Images are stored in the database (`UPLOAD_STORAGE=db`) because serverless functions have no persistent disk; uploads are capped at 4 MB.
 
+## Prohibited-item checks
+New listings, and edits to a listing's description or photo, are checked before they go live (`jhapto-backend/utils/moderation.js`):
+1. **Keyword rules** (always on, free): blocks descriptions that mention alcohol, tobacco/vapes, drugs, weapons, prescription medicines, exam leaks or fake documents, including spellings like `w33d` or `c i g s`.
+2. **AI review with Claude** (on when `ANTHROPIC_API_KEY` is set): reads the item, description **and photo**, and catches coded wording or a photo that doesn't match a harmless item. Uses `claude-opus-5-5` by default; set `MODERATION_MODEL` to change it, or `AI_MODERATION=off` to disable.
+   If the AI service is unavailable, the listing goes through on the keyword check alone.
+
 ## Scripts
 
 | Command | What it does |

@@ -255,8 +255,11 @@ const SellerDashboard = () => {
                     onRemove={() => { set({ photo_url: '' }); setPhotoInputKey(k => k + 1); }}
                   />
                 </div>
+                <p className="field-hint">
+                  Listings are checked automatically. Alcohol, tobacco and vapes, drugs, weapons, prescription medicines and other prohibited items are not allowed.
+                </p>
                 <button type="submit" className="btn btn-primary btn-block" disabled={uploading || creating}>
-                  {creating ? 'Listing…' : 'List item'}
+                  {creating ? 'Checking…' : 'List item'}
                 </button>
               </form>
             </section>

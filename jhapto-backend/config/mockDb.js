@@ -407,6 +407,14 @@ const query = async (sql, params = []) => {
     return [{ affectedRows: 1 }];
   }
 
+  // 12a. One item's catalogue details (listing moderation)
+  if (/SELECT i\.item_name, i\.brand, c\.category_name FROM Item i JOIN Category c .* WHERE i\.item_id = \?/i.test(cleanSql)) {
+    const i = items.find(it => it.item_id === Number(params[0]));
+    if (!i) return [[]];
+    const c = categories.find(cat => cat.category_id === i.category_id);
+    return [[{ item_name: i.item_name, brand: i.brand, category_name: c ? c.category_name : 'General' }]];
+  }
+
   // 12. Items List for Sell dropdown
   if (/SELECT i\.item_id, i\.item_name, i\.brand, c\.category_name/i.test(cleanSql)) {
     const rows = items.map(i => {
@@ -846,9 +854,9 @@ const query = async (sql, params = []) => {
   }
 
   // Listing edit
-  if (/SELECT listing_id, seller_id, item_id, mrp, selling_price, listing_status FROM Listing WHERE listing_id = \?/i.test(cleanSql)) {
+  if (/SELECT listing_id, seller_id, item_id, mrp, selling_price, listing_status, description, photo_url FROM Listing WHERE listing_id = \?/i.test(cleanSql)) {
     const l = listings.find(lst => lst.listing_id === Number(params[0]));
-    return [l ? [{ listing_id: l.listing_id, seller_id: l.seller_id, item_id: l.item_id, mrp: l.mrp, selling_price: l.selling_price, listing_status: l.listing_status }] : []];
+    return [l ? [{ listing_id: l.listing_id, seller_id: l.seller_id, item_id: l.item_id, mrp: l.mrp, selling_price: l.selling_price, listing_status: l.listing_status, description: l.description, photo_url: l.photo_url }] : []];
   }
 
   if (/SELECT listing_id FROM Listing WHERE seller_id = \? AND item_id = \? AND listing_status = 'Active' AND listing_id <> \?/i.test(cleanSql)) {
