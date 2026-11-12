@@ -1,0 +1,15 @@
+{
+  "appId": "com.jhapto.app",
+  "appName": "Jhapto",
+  "webDir": "www",
+  "server": {
+    "url": "https://jhapto.vercel.app",
+    "errorPath": "offline.html",
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#edebe8",
+    "appendUserAgent": "JhaptoAndroid/1.0"
+  }
+}

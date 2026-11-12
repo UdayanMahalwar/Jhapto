@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import StarRating from '../components/StarRating';
+import AppDownload from '../components/AppDownload';
 import { LogOut } from 'lucide-react';
 import { AuthContext } from '../contexts/AuthContext';
 import api from '../utils/api';
@@ -82,7 +83,10 @@ const ProfilePage = () => {
             <h1 className="page-title">My Profile</h1>
             <p className="page-subtitle">Your details, password and seller rating.</p>
           </div>
-          <button className="btn btn-ghost" onClick={logout}><LogOut size={16} /> Log out</button>
+          <div className="page-header-actions">
+            <AppDownload />
+            <button className="btn btn-ghost" onClick={logout}><LogOut size={16} /> Log out</button>
+          </div>
         </div>
 
         {!profile ? (

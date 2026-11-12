@@ -56,3 +56,16 @@ The original MySQL scripts (`jhapto-database/jhapto_database.sql` + migrations v
 * **Images** are uploaded to `POST /api/uploads`, checked by their actual bytes (PNG/JPEG/GIF/WebP, max 4 MB) and saved under random names — on disk locally, in the `upload` table on Vercel — and served from `/uploads/…`.
 * **Live chat**: locally, the chat page joins a Socket.IO room for the order and updates are pushed instantly; on Vercel the same pages poll every few seconds.
 * **Tests** rebuild `jhapto_test` from the real SQL file before each test file, so triggers and procedures are tested too. They refuse to run against a database whose name doesn't end in `_test`.
+
+## Android app
+`jhapto-mobile/` is a Capacitor app that opens https://jhapto.vercel.app in a native shell. Because it loads the live site, website updates reach the app without a reinstall. It adds the app icon, a splash screen, the hardware Back button, camera/gallery photo picking, and an offline screen.
+The signed APK is published with the website at `/downloads/jhapto.apk`, linked from the login and profile pages as **Get the Android app**.
+
+Rebuilding the APK (needs JDK 21 and the Android SDK):
+```bash
+cd jhapto-mobile && npm install
+export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home ANDROID_HOME=$HOME/Library/Android/sdk
+npm run build:apk
+cp android/app/build/outputs/apk/release/app-release.apk ../jhapto-frontend/public/downloads/jhapto.apk
+```
+Release signing reads `jhapto-mobile/android/keystore.properties` (kept out of git). Back up the key: Android won't install an update signed with a different key over an existing install.

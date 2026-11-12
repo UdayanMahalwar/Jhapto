@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import ThemeToggle from './ThemeToggle';
+import AppDownload from './AppDownload';
 
 const BG_EMOJI = [
   { e: '🍜', x: '8%', y: '14%', s: 54, d: 0 },
@@ -37,6 +38,7 @@ const AuthShell = ({ children }) => (
     >
       {children}
     </motion.div>
+    <AppDownload className="auth-app-download" />
   </div>
 );
 
