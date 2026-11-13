@@ -36,10 +36,19 @@ const isOptionalImage = (v) => {
   return /^https?:\/\/[^\s"'<>]+$/i.test(v);
 };
 
-const MIN_PASSWORD = 6;
+// router.param handler: route ids must be positive integers, otherwise 400
+// (stops junk like "abc" or "1' OR 1=1" from reaching the database at all)
+const intParam = (req, res, next, value) => {
+  if (!isIntInRange(value, 1, 2147483647) || !/^\d+$/.test(String(value))) {
+    return res.status(400).json({ message: 'Invalid id.' });
+  }
+  next();
+};
+
+const MIN_PASSWORD = 8;
 const isPassword = (v) => typeof v === 'string' && v.length >= MIN_PASSWORD && v.length <= 72;
 
 module.exports = {
   isNonEmptyString, isEmail, isPhone, isIntInRange, isPrice, isOptionalImage, isPassword,
-  MIN_PASSWORD, MAX_IMAGE_BYTES,
+  MIN_PASSWORD, MAX_IMAGE_BYTES, intParam,
 };

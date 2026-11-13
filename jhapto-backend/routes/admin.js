@@ -6,9 +6,11 @@ const router  = express.Router();
 const bcrypt  = require('bcryptjs');
 const jwt     = require('jsonwebtoken');
 const db      = require('../config/db');
-const { loginLimiter } = require('../middleware/rateLimit');
+const { loginLimiter, loginAccountLimiter } = require('../middleware/rateLimit');
 const v       = require('../utils/validate');
 const realtime = require('../realtime');
+
+router.param('id', v.intParam);   // ids must be numbers
 
 // Adds an in-app notification for a student (email / push follow automatically)
 async function notifyStudent(student_id, type, message, link) {
@@ -20,17 +22,25 @@ async function notifyStudent(student_id, type, message, link) {
 }
 
 // ── Admin auth middleware (separate from student auth) ───────
-const adminAuth = (req, res, next) => {
+const adminAuth = async (req, res, next) => {
   const token = req.headers['authorization']?.split(' ')[1];
   if (!token) return res.status(401).json({ message: 'Admin access required.', code: 'INVALID_TOKEN' });
+  let decoded;
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (!decoded.is_admin) return res.status(403).json({ message: 'Not an admin.' });
-    req.admin = decoded;
-    next();
+    decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
   } catch {
     return res.status(401).json({ message: 'Session expired. Please log in again.', code: 'INVALID_TOKEN' });
   }
+  if (!decoded.is_admin || !decoded.admin_id) return res.status(403).json({ message: 'Not an admin.' });
+  try {
+    // The admin account must still exist (a removed admin's old token stops working)
+    const [rows] = await db.query('SELECT admin_id, name FROM Admin WHERE admin_id = ?', [decoded.admin_id]);
+    if (rows.length === 0) return res.status(401).json({ message: 'Admin account no longer exists.', code: 'INVALID_TOKEN' });
+    req.admin = { ...decoded, name: rows[0].name };
+  } catch (err) {
+    return res.status(500).json({ message: 'Server error.', error: err.message });
+  }
+  next();
 };
 
 // ── POST /api/admin/register ─────────────────────────────────
@@ -81,7 +91,7 @@ router.get('/admins', adminAuth, async (req, res) => {
 });
 
 // ── POST /api/admin/login ────────────────────────────────────
-router.post('/login', loginLimiter, async (req, res) => {
+router.post('/login', loginLimiter, loginAccountLimiter, async (req, res) => {
   const { email, password } = req.body;
   if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
     return res.status(400).json({ message: 'Email and password are required.' });
@@ -91,7 +101,9 @@ router.post('/login', loginLimiter, async (req, res) => {
       'SELECT * FROM Admin WHERE lower(email) = lower(?)', [email.trim()]
     );
     const admin = rows[0];
-    const isMatch = admin ? await bcrypt.compare(password, admin.password_hash) : false;
+    // bcrypt runs even for unknown emails so timing doesn't reveal which admin emails exist
+    const isMatch = await bcrypt.compare(password, admin?.password_hash || '$2a$10$CwTycUXWue0Thq9StjUM0uJ8.8nQ3s8E5k0hYH7nEv0Gx0VdQ1v8W');
+    if (!admin) return res.status(401).json({ message: 'Invalid email or password.' });
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid email or password.' });
     }

@@ -150,7 +150,7 @@ const AuthPage = () => {
               </AnimatePresence>
 
               <input type="email" name="email" placeholder={isLogin ? 'Email Address' : `Thapar email (${domainHint})`} required onChange={handleChange} />
-              <input type="password" name="password" placeholder={isLogin ? 'Password' : 'Password (min 6 characters)'} required minLength={isLogin ? undefined : 6} onChange={handleChange} />
+              <input type="password" name="password" placeholder={isLogin ? 'Password' : 'Password (min 8 characters)'} required minLength={isLogin ? undefined : 8} onChange={handleChange} />
 
               <motion.button type="submit" className="auth-btn" whileTap={{ scale: 0.97 }} disabled={busy}>
                 {isLogin ? 'Log in' : 'Create account'}

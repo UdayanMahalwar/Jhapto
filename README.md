@@ -26,6 +26,7 @@ npm run db:setup                                     # tables, triggers, functio
 npm run dev                                          # http://localhost:3000
 ```
 Seed logins: any student (e.g. `aarav@tiet.ac.in`) / `password123`, admin `admin@jhapto.com` / `admin123`.
+These seed passwords are for **local** development only; the live site's demo and admin accounts use different, private passwords.
 
 `npm run dev` (nodemon, see `nodemon.json`) restarts the server when backend code changes; frontend changes hot-reload in the browser.
 Set `USE_MOCK_DB=true` in `jhapto-backend/.env` to run without a database (in-memory data, resets on restart).
@@ -69,3 +70,10 @@ npm run build:apk
 cp android/app/build/outputs/apk/release/app-release.apk ../jhapto-frontend/public/downloads/jhapto.apk
 ```
 Release signing reads `jhapto-mobile/android/keystore.properties` (kept out of git). Back up the key: Android won't install an update signed with a different key over an existing install.
+
+## Security
+- Logins: bcrypt-hashed passwords (min 8 characters), JWT sessions (HS256 only) that stop working after a password change, ban or admin removal; new sign-ups need a verified @thapar.edu address.
+- Abuse limits stored in the database (shared by every Vercel instance): failed logins per IP **and** per account, sign-ups, uploads, write requests per student, and new catalogue items per student per day.
+- Every route checks ownership (buyer / seller / reporter / admin); ids must be numbers; SQL is always parameterised; uploads are checked by their bytes, not their name.
+- Browser protections: strict Content-Security-Policy, no framing, `nosniff`, HSTS, and an API that only Jhapto's own sites can call. Server errors never send internal details to the browser.
+- `jhapto-backend/tests/security.test.js` keeps these attacks failing.

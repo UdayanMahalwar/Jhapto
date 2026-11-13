@@ -60,5 +60,9 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "1.14.7",
+    "zod": "4.6.7"
   }
 }

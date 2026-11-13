@@ -90,7 +90,7 @@ describe('Sign in with Google', () => {
 
   test('a password account with the same email is linked, not duplicated', async () => {
     await api().post('/api/auth/register').send({
-      name: 'Meera', email: 'meera@thapar.edu', phone_no: '9000000002', password: 'secret1', hostel_id: 1, floor_id: 2,
+      name: 'Meera', email: 'meera@thapar.edu', phone_no: '9000000002', password: 'secret123', hostel_id: 1, floor_id: 2,
     }).expect(201);
     googleSays({ sub: 'g-meera', email: 'meera@thapar.edu', hd: 'thapar.edu' });
     const res = await api().post('/api/auth/google').send({ credential: 'token' }).expect(200);
@@ -186,7 +186,7 @@ describe('admins add hostels', () => {
 
     // and students can register into it
     await api().post('/api/auth/register').send({
-      name: 'New Resident', email: 'resident@thapar.edu', phone_no: '9000000003', password: 'secret1',
+      name: 'New Resident', email: 'resident@thapar.edu', phone_no: '9000000003', password: 'secret123',
       hostel_id: listed.hostel_id, floor_id: listed.floors[4].floor_id,
     }).expect(201);
   });

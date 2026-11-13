@@ -8,6 +8,45 @@ const express = require('express');
 const cors    = require('cors');
 const uploadStore = require('./utils/uploadStore');
 const { deliverPending } = require('./utils/notify');
+const { writeLimiter } = require('./middleware/rateLimit');
+
+// Only Jhapto's own sites may call the API from a browser (the Android app loads
+// the live site, so it's same-origin too). Requests without an Origin header
+// (curl, server-to-server, same-origin GETs) aren't affected by CORS anyway.
+function allowedOrigins() {
+  const list = new Set(['http://localhost:3000', 'http://localhost:5173', 'http://localhost:4173']);
+  for (const url of [process.env.SITE_URL, 'https://jhapto.vercel.app', ...(process.env.EXTRA_ORIGINS || '').split(',')]) {
+    try { if (url) list.add(new URL(url.trim()).origin); } catch { /* ignore bad values */ }
+  }
+  return list;
+}
+
+// Security headers for API responses (pages get theirs from vercel.json / server.js)
+function apiSecurityHeaders(req, res, next) {
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Cross-Origin-Resource-Policy': 'same-origin',
+  });
+  if (req.path.startsWith('/api')) res.set('Cache-Control', 'no-store');
+  next();
+}
+
+// 5xx responses keep a friendly message but never send internal details
+// (SQL errors, stack traces) to the browser; they're logged on the server instead.
+function hideServerErrors(req, res, next) {
+  const json = res.json.bind(res);
+  res.json = (body) => {
+    if (res.statusCode >= 500 && body && typeof body === 'object' && 'error' in body && process.env.SHOW_ERROR_DETAILS !== 'true') {
+      console.error(`${req.method} ${req.originalUrl} → ${res.statusCode}:`, body.error);
+      const { error, ...rest } = body;   // eslint-disable-line no-unused-vars
+      return json(rest);
+    }
+    return json(body);
+  };
+  next();
+}
 
 // After a successful write request, send the email / push for any notifications it created.
 // Vercel freezes a function once it has responded, so there the work is registered
@@ -49,11 +88,15 @@ function createApp() {
   app.disable('x-powered-by');
   // Behind a hosting proxy (Render, etc.) use the real client IP for rate limiting
   if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY);
-  app.use(cors());
+  const origins = allowedOrigins();
+  app.use(cors({ origin: (origin, cb) => cb(null, !origin || origins.has(origin)) }));
+  app.use(apiSecurityHeaders);
+  app.use(hideServerErrors);
   app.use(express.json({ limit: '1mb' }));   // images go through /api/uploads, not JSON
   app.use(express.urlencoded({ limit: '1mb', extended: true }));
 
   app.use('/api', deliverAfterWrite);
+  app.use('/api', writeLimiter);
 
   // ── API routes ─────────────────────────────────────────────
   app.use('/api/auth',          require('./routes/auth'));

@@ -7,6 +7,8 @@ const db      = require('../config/db');
 const auth    = require('../middleware/auth');
 const v       = require('../utils/validate');
 
+router.param('id', v.intParam);   // ids must be numbers
+
 // ── GET /api/listings ────────────────────────────────────────
 // Returns all active listings, floor-priority sorted
 // Uses the MySQL stored procedure sp_floor_priority_listings
@@ -42,6 +44,8 @@ router.get('/my', auth, async (req, res) => {
   }
 });
 
+const NEW_ITEMS_PER_DAY = 20;
+
 // Finds an item by name + brand (any capitalisation) or adds it to the catalogue.
 // Returns { item_id } or { error } for the seller.
 async function findOrCreateItem(newItem, student_id) {
@@ -56,17 +60,28 @@ async function findOrCreateItem(newItem, student_id) {
   const [cats] = await db.query('SELECT category_id FROM Category WHERE category_id = ?', [newItem.category_id]);
   if (cats.length === 0) return { error: 'Choose a category for the new item.' };
 
+  const findItem = async () => (await db.query(
+    `SELECT item_id FROM Item WHERE lower(item_name) = lower(?) AND lower(coalesce(brand, '')) = lower(coalesce(?, ''))`,
+    [name, brand]
+  ))[0][0];
+  const existing = await findItem();
+  if (existing) return { item_id: existing.item_id };
+
+  // Stop one account flooding the catalogue with made-up items
+  const [[{ recent }]] = await db.query(
+    `SELECT COUNT(*) AS recent FROM Item WHERE created_by = ? AND created_at > now() - interval '1 day'`, [student_id]
+  );
+  if (Number(recent) >= NEW_ITEMS_PER_DAY) {
+    return { error: `You can add at most ${NEW_ITEMS_PER_DAY} new items a day. Pick one from the list or try tomorrow.` };
+  }
+
   // ON CONFLICT handles two sellers adding the same new item at the same moment
   await db.query(
     `INSERT INTO Item (item_name, brand, category_id, created_by) VALUES (?, ?, ?, ?)
      ON CONFLICT (lower(item_name), lower(coalesce(brand, ''))) DO NOTHING`,
     [name, brand, newItem.category_id, student_id]
   );
-  const [rows] = await db.query(
-    `SELECT item_id FROM Item WHERE lower(item_name) = lower(?) AND lower(coalesce(brand, '')) = lower(coalesce(?, ''))`,
-    [name, brand]
-  );
-  return { item_id: rows[0].item_id };
+  return { item_id: (await findItem()).item_id };
 }
 
 // ── POST /api/listings ───────────────────────────────────────

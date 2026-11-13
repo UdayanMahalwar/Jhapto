@@ -44,6 +44,7 @@ CREATE TABLE student (
     floor_id      INT NOT NULL REFERENCES floor(floor_id),
     is_banned     BOOLEAN NOT NULL DEFAULT FALSE,
     email_notifications BOOLEAN NOT NULL DEFAULT TRUE,
+    password_changed_at TIMESTAMPTZ,                  -- sessions issued before this are rejected
     avg_rating    NUMERIC(3,2),                       -- maintained by trg_review_after_insert
     rating_count  INT NOT NULL DEFAULT 0,
     created_at    TIMESTAMPTZ DEFAULT now()
@@ -129,6 +130,14 @@ CREATE TABLE report_message (
     created_at        TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX idx_report_message_report ON report_message (report_id, created_at);
+
+-- Request counters for rate limiting, shared by all server instances
+CREATE TABLE rate_limit (
+    key       VARCHAR(200) PRIMARY KEY,
+    hits      INT NOT NULL,
+    reset_at  TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX idx_rate_limit_reset ON rate_limit (reset_at);
 
 -- Firebase Cloud Messaging device tokens (Android app + browsers)
 CREATE TABLE push_token (
