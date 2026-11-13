@@ -14,3 +14,11 @@ process.env.UPLOAD_DIR          = path.join(os.tmpdir(), 'jhapto-test-uploads');
 if (!/_test$/.test(process.env.DB_NAME)) {
   throw new Error(`Refusing to run tests against "${process.env.DB_NAME}" — the name must end in _test.`);
 }
+
+// Never send real email / push from tests, even if jhapto-backend/.env has credentials
+// (features.test.js switches these back on with fake Gmail / Firebase clients).
+process.env.EMAIL_NOTIFICATIONS = 'off';
+process.env.PUSH_NOTIFICATIONS  = 'off';
+process.env.SITE_URL            = 'https://jhapto.vercel.app';
+process.env.GOOGLE_CLIENT_ID    = '';
+process.env.ADMIN_ALERT_EMAIL   = '';

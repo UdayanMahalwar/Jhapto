@@ -236,7 +236,9 @@ describe('sellers can list items that are not in the catalogue', () => {
 describe('notifications go out by email and push', () => {
   const saved = {};
   beforeAll(() => {
-    for (const k of ['GMAIL_USER', 'GMAIL_APP_PASSWORD', 'FIREBASE_SERVICE_ACCOUNT']) saved[k] = process.env[k];
+    for (const k of ['GMAIL_USER', 'GMAIL_APP_PASSWORD', 'FIREBASE_SERVICE_ACCOUNT', 'EMAIL_NOTIFICATIONS', 'PUSH_NOTIFICATIONS']) saved[k] = process.env[k];
+    process.env.EMAIL_NOTIFICATIONS = 'on';   // the fakes above stand in for Gmail and Firebase
+    process.env.PUSH_NOTIFICATIONS = 'on';
     process.env.GMAIL_USER = 'jhapto.alerts@gmail.com';
     process.env.GMAIL_APP_PASSWORD = 'app-password';
     process.env.FIREBASE_SERVICE_ACCOUNT = JSON.stringify({ project_id: 'jhapto-test' });
@@ -244,11 +246,13 @@ describe('notifications go out by email and push', () => {
   afterAll(() => Object.assign(process.env, saved));
 
   test('each new notification is emailed and pushed once; opted-out students get push only', async () => {
+    // a real Thapar address for Sneha (demo @tiet.ac.in addresses are never emailed)
+    await sql("UPDATE Student SET email = 'sneha@thapar.edu' WHERE student_id = 4");
     await deliverPending();               // flush anything earlier tests created
     mockSendMail.mockClear();
     mockSendEachForMulticast.mockReset();
 
-    const sneha = await login('sneha');
+    const sneha = (await api().post('/api/auth/login').send({ email: 'sneha@thapar.edu', password: 'password123' })).body.token;
     await api().post('/api/push/register').set(bearer(sneha)).send({ token: 'device-token-sneha-0001', platform: 'android' }).expect(200);
     await api().post('/api/push/register').set(bearer(sneha)).send({ token: 'device-token-dead-00002', platform: 'web' }).expect(200);
     expect((await api().post('/api/push/register').set(bearer(sneha)).send({ token: 'x', platform: 'android' })).status).toBe(400);
@@ -265,7 +269,7 @@ describe('notifications go out by email and push', () => {
 
     expect(mockSendMail).toHaveBeenCalledTimes(1);
     const mail = mockSendMail.mock.calls[0][0];
-    expect(mail).toMatchObject({ to: 'sneha@tiet.ac.in', subject: 'New order on Jhapto' });
+    expect(mail).toMatchObject({ to: 'sneha@thapar.edu', subject: 'New order on Jhapto' });
     expect(mail.text).toMatch(/New order #\d+/);
     expect(mail.html).toMatch(/https:\/\/jhapto\.vercel\.app\/seller/);
 
@@ -287,6 +291,24 @@ describe('notifications go out by email and push', () => {
     await deliverPending();
     expect(mockSendMail).toHaveBeenCalledTimes(1);
     expect(mockSendEachForMulticast).toHaveBeenCalledTimes(2);
+  });
+
+  test('demo accounts with non-Thapar emails get push but never email; admin alerts go to ADMIN_ALERT_EMAIL', async () => {
+    mockSendMail.mockClear();
+    mockSendEachForMulticast.mockReset();
+    mockSendEachForMulticast.mockResolvedValue({ successCount: 1, responses: [{ success: true }] });
+    await sql(`INSERT INTO push_token (token, student_id, platform) VALUES ('karan-device-token-001', 5, 'android') ON CONFLICT DO NOTHING`);
+    await sql(`INSERT INTO Notification (student_id, type, message, link) VALUES (5, 'review', 'Test', '/profile')`);
+    await deliverPending();
+    expect(mockSendMail).not.toHaveBeenCalled();
+    expect(mockSendEachForMulticast).toHaveBeenCalledTimes(1);
+
+    process.env.ADMIN_ALERT_EMAIL = 'team@thapar.edu';
+    await api().post('/api/reports').set(bearer(await login('rohan')))
+      .send({ order_id: 1, reported_user_id: 1, reason: 'Second report for the admin email test' });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(mockSendMail.mock.calls.map((c) => c[0].to)).toEqual(['team@thapar.edu']);
+    process.env.ADMIN_ALERT_EMAIL = '';
   });
 
   test('chat messages are pushed to the other person', async () => {

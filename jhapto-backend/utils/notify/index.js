@@ -12,6 +12,7 @@
 const db = require('../../config/db');
 const { sendEmail, isConfigured: emailOn } = require('./email');
 const { sendPush, isConfigured: pushOn } = require('./push');
+const { isAllowedEmail } = require('../google');
 
 const SUBJECTS = {
   order_placed: 'New order on Jhapto',
@@ -47,7 +48,8 @@ async function deliverBatch() {
   await Promise.all(rows.map(async (n) => {
     if (n.is_banned) return;
     const jobs = [];
-    if (n.email_notifications) {
+    // Only real student addresses (e.g. @thapar.edu) — never the demo accounts' made-up ones
+    if (n.email_notifications && isAllowedEmail(n.email)) {
       jobs.push(sendEmail({
         to: n.email, name: n.name.split(' ')[0], subject: SUBJECTS[n.type] || 'Jhapto notification',
         message: n.message, link: n.link,
@@ -88,12 +90,12 @@ function deliverPending() {
 const pushOnly = (student_id, payload) =>
   sendPush(student_id, payload).catch((err) => console.warn('Push failed:', err.message));
 
-// Emails every admin (new reports, report replies). Best effort.
+// Emails the admin team (new reports, report replies) at ADMIN_ALERT_EMAIL
+// (comma-separated; defaults to the sending Gmail inbox). Best effort.
 async function emailAdmins({ subject, message, link }) {
   if (!emailOn()) return;
-  const [admins] = await db.query('SELECT name, email FROM Admin');
-  await Promise.allSettled(admins.map((a) =>
-    sendEmail({ to: a.email, name: a.name.split(' ')[0], subject, message, link })));
+  const to = (process.env.ADMIN_ALERT_EMAIL || process.env.GMAIL_USER || '').split(',').map((e) => e.trim()).filter(Boolean);
+  await Promise.allSettled(to.map((address) => sendEmail({ to: address, name: 'Admin', subject, message, link })));
 }
 
 // Starts background work during a request (kept alive on Vercel until it finishes)
