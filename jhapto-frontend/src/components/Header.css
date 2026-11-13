@@ -275,7 +275,9 @@
     text-overflow: ellipsis;
   }
 
-  .bottom-nav {
+  .bottom-nav,
+  .app > .bottom-nav {
+    width: auto;            /* sized by left/right, not the generic ".app > *" full width */
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     position: fixed;
