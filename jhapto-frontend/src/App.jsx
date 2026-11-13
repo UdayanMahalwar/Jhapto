@@ -16,6 +16,7 @@ import ProfilePage from './pages/ProfilePage';
 import CartPage from './pages/CartPage';
 import ReportsPage from './pages/ReportsPage';
 import AppUpdatePrompt from './components/AppUpdatePrompt';
+import BottomNav from './components/BottomNav';
 import { enablePush } from './utils/push';
 import { isNativeApp } from './utils/native';
 import './App.css';
@@ -35,10 +36,11 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
 };
 
 // Each page fades and lifts in; the previous one fades out first
+// (quick, so switching tabs feels instant; the bottom bar stays still meanwhile)
 const pageMotion = {
-  initial: { opacity: 0, y: 14 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.38, ease: [0.22, 1, 0.36, 1] } },
-  exit: { opacity: 0, y: -6, transition: { duration: 0.16, ease: 'easeIn' } },
+  initial: { opacity: 0, y: 8 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.26, ease: [0.22, 1, 0.36, 1] } },
+  exit: { opacity: 0, transition: { duration: 0.1, ease: 'easeIn' } },
 };
 
 // In the Android app, turn on push notifications once a student is logged in
@@ -61,7 +63,8 @@ function AppRoutes() {
     <div className="app">
       <NativePushSetup />
       <AppUpdatePrompt />
-      <AnimatePresence mode="wait" initial={false}>
+      {/* new pages start at the top (after the old one has faded out) */}
+      <AnimatePresence mode="wait" initial={false} onExitComplete={() => window.scrollTo(0, 0)}>
       <motion.div key={pageKey} className="page-transition" {...pageMotion}>
       <Routes location={location}>
         <Route path="/login" element={<AuthPage />} />
@@ -86,6 +89,7 @@ function AppRoutes() {
       </Routes>
       </motion.div>
       </AnimatePresence>
+      <BottomNav />
     </div>
   );
 }

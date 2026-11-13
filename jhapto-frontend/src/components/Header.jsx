@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Search, MapPin, ShoppingBag, LogOut, Home, Package, Store, User, X } from 'lucide-react';
+import { Search, MapPin, ShoppingBag, LogOut, X } from 'lucide-react';
+import { NAV } from './BottomNav';
 import NotificationBell from './NotificationBell';
 import ThemeToggle from './ThemeToggle';
 import CountBadge from './CountBadge';
@@ -10,11 +11,6 @@ import './Header.css';
 
 const initials = (name = '') => name.split(' ').map(p => p[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
 
-const NAV = [
-  { to: '/', label: 'Home', icon: Home, match: (p) => p === '/' },
-  { to: '/orders', label: 'Orders', icon: Package, match: (p) => p.startsWith('/orders') || p.startsWith('/chat') },
-  { to: '/seller', label: 'Sell', icon: Store, match: (p) => p.startsWith('/seller') },
-];
 
 const Header = ({ user, onLogout, searchQuery, onSearchChange }) => {
   const navigate = useNavigate();
@@ -129,26 +125,6 @@ const Header = ({ user, onLogout, searchQuery, onSearchChange }) => {
         </AnimatePresence>
       </header>
 
-      {/* Mobile bottom tab bar */}
-      {user && (
-        <nav className="bottom-nav" aria-label="Main">
-          {[...NAV, { to: '/cart', label: 'Cart', icon: ShoppingBag, match: (p) => p === '/cart', badge: cartCount },
-            { to: '/profile', label: 'Profile', icon: User, match: (p) => p === '/profile' }].map(item => {
-            const active = item.match(pathname);
-            const Icon = item.icon;
-            return (
-              <button key={item.to} className={`bottom-nav-item ${active ? 'active' : ''}`} onClick={() => navigate(item.to)} aria-current={active ? 'page' : undefined}>
-                {active && <motion.span layoutId="bottom-pill" className="bottom-pill" transition={{ type: 'spring', stiffness: 500, damping: 36 }} />}
-                <span className="bottom-nav-icon">
-                  <Icon size={21} />
-                  {item.badge > 0 && <CountBadge count={item.badge} className="cart-badge small" />}
-                </span>
-                <span className="bottom-nav-label">{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-      )}
     </>
   );
 };
