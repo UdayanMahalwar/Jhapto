@@ -133,7 +133,7 @@ const AuthPage = () => {
           </form>
         ) : (
           <>
-            <GoogleSignIn onCredential={handleGoogle} onError={setError} />
+            {isLogin && <GoogleSignIn onCredential={handleGoogle} onError={setError} />}
 
             <form className="auth-form" onSubmit={handleSubmit}>
               <AnimatePresence initial={false}>
