@@ -5,6 +5,7 @@ const express = require('express');
 const router  = express.Router();
 const db      = require('../config/db');
 const auth    = require('../middleware/auth');
+const notify  = require('../utils/notify');
 const realtime = require('../realtime');
 
 // ── GET /api/messages/unread ─────────────────────────────
@@ -175,6 +176,10 @@ router.post('/:order_id', auth, async (req, res) => {
     // Live delivery to whoever has this chat open, and a badge update for the receiver
     realtime.emitToOrder(order_id, 'message:new', message);
     realtime.emitToUser(receiver_id, 'notifications:changed');
+    const preview = message.message_text.length > 120 ? `${message.message_text.slice(0, 117)}…` : message.message_text;
+    notify.inBackground(notify.pushOnly(receiver_id, {
+      title: `${req.user.name} · Order #${order_id}`, body: preview, link: `/chat/${order_id}`,
+    }));
 
     res.status(201).json({ message: 'Message sent!', data: message });
   } catch (err) {

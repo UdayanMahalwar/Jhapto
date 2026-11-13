@@ -34,7 +34,7 @@ const ReportDialog = ({ order, reportedUserId, reportedName, roleLabel, onClose 
     setError('');
     try {
       await api.post('/reports', { order_id: order.order_id, reported_user_id: reportedUserId, reason, proof_url: proof });
-      toast('Report submitted. Admins will review it.');
+      toast('Report submitted. Follow it and talk to the admins under Profile → My reports.');
       onClose();
     } catch (err) {
       setError(err.response?.data?.message || 'Error submitting report');

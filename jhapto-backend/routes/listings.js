@@ -42,11 +42,53 @@ router.get('/my', auth, async (req, res) => {
   }
 });
 
+// Finds an item by name + brand (any capitalisation) or adds it to the catalogue.
+// Returns { item_id } or { error } for the seller.
+async function findOrCreateItem(newItem, student_id) {
+  if (!newItem || typeof newItem !== 'object') return { error: 'Choose an item from the list or add a new one.' };
+  const name  = typeof newItem.item_name === 'string' ? newItem.item_name.replace(/\s+/g, ' ').trim() : '';
+  const brand = typeof newItem.brand === 'string' && newItem.brand.trim() ? newItem.brand.replace(/\s+/g, ' ').trim() : null;
+  if (name.length < 2 || name.length > 150) return { error: 'Item name must be 2–150 characters.' };
+  if (!/[a-z0-9]/i.test(name)) return { error: 'Item name must contain letters or numbers.' };
+  if (brand && brand.length > 100) return { error: 'Brand can be at most 100 characters.' };
+  if (!v.isIntInRange(newItem.category_id, 1, 1e6)) return { error: 'Choose a category for the new item.' };
+
+  const [cats] = await db.query('SELECT category_id FROM Category WHERE category_id = ?', [newItem.category_id]);
+  if (cats.length === 0) return { error: 'Choose a category for the new item.' };
+
+  // ON CONFLICT handles two sellers adding the same new item at the same moment
+  await db.query(
+    `INSERT INTO Item (item_name, brand, category_id, created_by) VALUES (?, ?, ?, ?)
+     ON CONFLICT (lower(item_name), lower(coalesce(brand, ''))) DO NOTHING`,
+    [name, brand, newItem.category_id, student_id]
+  );
+  const [rows] = await db.query(
+    `SELECT item_id FROM Item WHERE lower(item_name) = lower(?) AND lower(coalesce(brand, '')) = lower(coalesce(?, ''))`,
+    [name, brand]
+  );
+  return { item_id: rows[0].item_id };
+}
+
 // ── POST /api/listings ───────────────────────────────────────
 // Creates a new listing (price validation handled by DB trigger)
 router.post('/', auth, async (req, res) => {
-  const { item_id, mrp, selling_price, quantity_available, description, photo_url, room_number } = req.body;
+  let { item_id } = req.body;
+  const { new_item, mrp, selling_price, quantity_available, description, photo_url, room_number } = req.body;
   const seller_id = req.user.student_id;
+
+  // A seller can pick a catalogue item (item_id) or describe a new one (new_item)
+  if (!item_id && new_item) {
+    if (!mrp || !selling_price || !quantity_available || !room_number) {
+      return res.status(400).json({ message: 'mrp, selling_price, quantity, and room_number are required.' });
+    }
+    try {
+      const found = await findOrCreateItem(new_item, seller_id);
+      if (found.error) return res.status(400).json({ message: found.error });
+      item_id = found.item_id;
+    } catch (err) {
+      return res.status(500).json({ message: 'Error adding the item.', error: err.message });
+    }
+  }
 
   if (!item_id || !mrp || !selling_price || !quantity_available || !room_number) {
     return res.status(400).json({ message: 'item_id, mrp, selling_price, quantity, and room_number are required.' });
@@ -86,7 +128,7 @@ router.post('/', auth, async (req, res) => {
        description ? description.trim() : null, photo_url || null, room_number.trim()]
     );
 
-    res.status(201).json({ message: 'Listing created successfully!' });
+    res.status(201).json({ message: 'Listing created successfully!', item_id: Number(item_id) });
   } catch (err) {
     // Catch trigger errors (e.g. duplicate active listing)
     if (err.sqlState === '45000') {

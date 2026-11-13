@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
-import { SearchX } from 'lucide-react';
+import { SearchX, Plus } from 'lucide-react';
 import Header from '../components/Header';
 import HeroBanner from '../components/HeroBanner';
 import CategoryList, { SAVED } from '../components/CategoryList';
@@ -146,6 +146,12 @@ const HomePage = () => {
                     initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                     <div className="empty-state-icon" aria-hidden="true"><SearchX size={22} /></div>
                     <p>{emptyMessage}</p>
+                    {query && (
+                      <button className="btn btn-primary" style={{ marginTop: '0.75rem' }}
+                        onClick={() => navigate(`/seller?new_item=${encodeURIComponent(searchQuery.trim())}`)}>
+                        <Plus size={16} /> Have “{searchQuery.trim()}”? Sell it
+                      </button>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>

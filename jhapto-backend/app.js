@@ -7,6 +7,34 @@ require('./config/env');
 const express = require('express');
 const cors    = require('cors');
 const uploadStore = require('./utils/uploadStore');
+const { deliverPending } = require('./utils/notify');
+
+// After a successful write request, send the email / push for any notifications it created.
+// Vercel freezes a function once it has responded, so there the work is registered
+// with waitUntil() while the request is still running.
+function deliverAfterWrite(req, res, next) {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
+  const finished = new Promise((resolve) => res.on('finish', resolve));
+  const work = finished.then(() => (res.statusCode < 400 ? deliverPending() : 0));
+  if (process.env.VERCEL) require('@vercel/functions').waitUntil(work);
+  next();
+}
+
+// Public settings the frontend needs at runtime (all safe to expose)
+function publicConfig() {
+  let firebase = null;
+  try {
+    firebase = process.env.FIREBASE_WEB_CONFIG ? JSON.parse(process.env.FIREBASE_WEB_CONFIG) : null;
+  } catch {
+    firebase = null;
+  }
+  return {
+    googleClientId: process.env.GOOGLE_CLIENT_ID || null,
+    allowedEmailDomains: (process.env.ALLOWED_EMAIL_DOMAINS || 'thapar.edu').split(',').map((d) => d.trim()),
+    firebase,
+    vapidKey: process.env.FIREBASE_VAPID_KEY || null,
+  };
+}
 
 const UPLOAD_NAME_RE = /^[0-9a-f]{32}\.(png|jpg|gif|webp)$/;
 const UPLOAD_HEADERS = {
@@ -25,6 +53,8 @@ function createApp() {
   app.use(express.json({ limit: '1mb' }));   // images go through /api/uploads, not JSON
   app.use(express.urlencoded({ limit: '1mb', extended: true }));
 
+  app.use('/api', deliverAfterWrite);
+
   // ── API routes ─────────────────────────────────────────────
   app.use('/api/auth',          require('./routes/auth'));
   app.use('/api/listings',      require('./routes/listings'));
@@ -35,6 +65,11 @@ function createApp() {
   app.use('/api/reviews',       require('./routes/reviews'));
   app.use('/api/notifications', require('./routes/notifications'));
   app.use('/api/uploads',       require('./routes/uploads'));
+  app.use('/api/push',          require('./routes/push'));
+
+  app.get('/api/config', (req, res) => {
+    res.set('Cache-Control', 'public, max-age=300').json(publicConfig());
+  });
 
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'Jhapto Server is running!' });
