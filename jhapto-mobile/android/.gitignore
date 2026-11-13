@@ -104,3 +104,6 @@ app/src/main/res/xml/config.xml
 keystore.properties
 *.jks
 *.keystore
+
+# Firebase config for this app (added per machine, see README)
+app/google-services.json

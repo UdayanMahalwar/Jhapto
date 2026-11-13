@@ -38,10 +38,12 @@ CREATE TABLE student (
     name          VARCHAR(100) NOT NULL,
     email         VARCHAR(150) NOT NULL UNIQUE,
     phone_no      VARCHAR(15)  NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255),                       -- NULL for Google-only accounts
+    google_sub    VARCHAR(64) UNIQUE,                 -- Google account id (sign in with Google)
     hostel_id     INT NOT NULL REFERENCES hostel(hostel_id),
     floor_id      INT NOT NULL REFERENCES floor(floor_id),
     is_banned     BOOLEAN NOT NULL DEFAULT FALSE,
+    email_notifications BOOLEAN NOT NULL DEFAULT TRUE,
     avg_rating    NUMERIC(3,2),                       -- maintained by trg_review_after_insert
     rating_count  INT NOT NULL DEFAULT 0,
     created_at    TIMESTAMPTZ DEFAULT now()
@@ -56,8 +58,12 @@ CREATE TABLE item (
     item_id       SERIAL PRIMARY KEY,
     item_name     VARCHAR(150) NOT NULL,
     brand         VARCHAR(100),
-    category_id   INT NOT NULL REFERENCES category(category_id)
+    category_id   INT NOT NULL REFERENCES category(category_id),
+    created_by    INT REFERENCES student(student_id) ON DELETE SET NULL,   -- NULL = catalogue item
+    created_at    TIMESTAMPTZ DEFAULT now()
 );
+-- One catalogue entry per name + brand, whatever the capitalisation
+CREATE UNIQUE INDEX uq_item_name_brand ON item (lower(item_name), lower(coalesce(brand, '')));
 
 CREATE TABLE listing (
     listing_id         SERIAL PRIMARY KEY,
@@ -112,6 +118,27 @@ CREATE TABLE report (
     created_at       TIMESTAMPTZ DEFAULT now()
 );
 
+-- Conversation between the student who filed a report and the admins
+CREATE TABLE report_message (
+    report_message_id SERIAL PRIMARY KEY,
+    report_id         INT NOT NULL REFERENCES report(report_id) ON DELETE CASCADE,
+    sender_role       VARCHAR(7) NOT NULL CHECK (sender_role IN ('student', 'admin')),
+    student_id        INT REFERENCES student(student_id) ON DELETE CASCADE,
+    admin_id          INT REFERENCES admin(admin_id) ON DELETE SET NULL,
+    message_text      TEXT NOT NULL,
+    created_at        TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX idx_report_message_report ON report_message (report_id, created_at);
+
+-- Firebase Cloud Messaging device tokens (Android app + browsers)
+CREATE TABLE push_token (
+    token       VARCHAR(512) PRIMARY KEY,
+    student_id  INT NOT NULL REFERENCES student(student_id) ON DELETE CASCADE,
+    platform    VARCHAR(10) NOT NULL CHECK (platform IN ('android', 'web')),
+    updated_at  TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX idx_push_token_student ON push_token (student_id);
+
 CREATE TABLE review (
     review_id    SERIAL PRIMARY KEY,
     order_id     INT NOT NULL UNIQUE REFERENCES "Order"(order_id) ON DELETE CASCADE,
@@ -131,8 +158,10 @@ CREATE TABLE notification (
     message         VARCHAR(255) NOT NULL,
     link            VARCHAR(100),
     is_read         BOOLEAN NOT NULL DEFAULT FALSE,
+    delivered       BOOLEAN NOT NULL DEFAULT FALSE,   -- sent by email / push yet?
     created_at      TIMESTAMPTZ DEFAULT now()
 );
+CREATE INDEX idx_notification_undelivered ON notification (notification_id) WHERE NOT delivered;
 CREATE INDEX idx_notification_student ON notification (student_id, is_read, created_at);
 
 -- Uploaded images (UPLOAD_STORAGE=db, used on Vercel where there is no disk)

@@ -1,5 +1,5 @@
-import React, { useContext } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import React, { useContext, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { AuthProvider, AuthContext } from './contexts/AuthContext';
 import { CartProvider } from './contexts/CartContext';
@@ -14,6 +14,9 @@ import ChatPage from './pages/ChatPage';
 import AdminDashboard from './pages/AdminDashboard';
 import ProfilePage from './pages/ProfilePage';
 import CartPage from './pages/CartPage';
+import ReportsPage from './pages/ReportsPage';
+import { enablePush } from './utils/push';
+import { isNativeApp } from './utils/native';
 import './App.css';
 
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
@@ -37,6 +40,17 @@ const pageMotion = {
   exit: { opacity: 0, y: -6, transition: { duration: 0.16, ease: 'easeIn' } },
 };
 
+// In the Android app, turn on push notifications once a student is logged in
+// (Android asks for permission the first time). Tapping a notification opens its page.
+function NativePushSetup() {
+  const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (user && isNativeApp()) enablePush((link) => navigate(link));
+  }, [user?.student_id]);
+  return null;
+}
+
 function AppRoutes() {
   const location = useLocation();
   // chat pages for different orders count as different pages
@@ -44,6 +58,7 @@ function AppRoutes() {
 
   return (
     <div className="app">
+      <NativePushSetup />
       <AnimatePresence mode="wait" initial={false}>
       <motion.div key={pageKey} className="page-transition" {...pageMotion}>
       <Routes location={location}>
@@ -57,6 +72,8 @@ function AppRoutes() {
         <Route path="/chat/:order_id" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
         <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
+        <Route path="/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
+        <Route path="/reports/:id" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
         
         {/* Protected Admin Routes */}
         <Route path="/admin/dashboard" element={<ProtectedRoute requireAdmin={true}><AdminDashboard /></ProtectedRoute>} />
