@@ -62,7 +62,21 @@ const GoogleSignIn = ({ onCredential, onError }) => {
     return () => { cancelled = true; };
   }, [native, clientId, domain, theme]);
 
-  if (!clientId) return null;   // Google sign-in not set up on the server
+  const divider = <div className="auth-divider"><span>or use email</span></div>;
+
+  if (config === null) return null;   // still loading
+  if (!clientId) {
+    // The server has no GOOGLE_CLIENT_ID yet: show the option, but say why it's unavailable
+    return (
+      <>
+        <button type="button" className="google-native-btn" disabled aria-describedby="google-unavailable">
+          <GoogleMark /> Continue with Google
+        </button>
+        <p id="google-unavailable" className="google-unavailable">Google sign-in isn’t set up on this server yet.</p>
+        {divider}
+      </>
+    );
+  }
 
   if (native) {
     const signIn = async () => {
@@ -82,13 +96,21 @@ const GoogleSignIn = ({ onCredential, onError }) => {
       }
     };
     return (
-      <button type="button" className="google-native-btn" onClick={signIn} disabled={busy}>
-        <GoogleMark /> {busy ? 'Signing in…' : 'Continue with Google'}
-      </button>
+      <>
+        <button type="button" className="google-native-btn" onClick={signIn} disabled={busy}>
+          <GoogleMark /> {busy ? 'Signing in…' : 'Continue with Google'}
+        </button>
+        {divider}
+      </>
     );
   }
 
-  return <div className="google-btn-slot" ref={buttonRef} />;
+  return (
+    <>
+      <div className="google-btn-slot" ref={buttonRef} />
+      {divider}
+    </>
+  );
 };
 
 export default GoogleSignIn;

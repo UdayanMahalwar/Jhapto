@@ -197,3 +197,5 @@
   font-size: 0.9rem;
   overflow-wrap: anywhere;
 }
+.google-native-btn:disabled { cursor: not-allowed; opacity: 0.55; }
+.google-unavailable { margin: 0.45rem 0 0; text-align: center; font-size: 0.8rem; color: var(--text-secondary); }

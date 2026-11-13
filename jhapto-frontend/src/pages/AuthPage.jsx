@@ -134,7 +134,6 @@ const AuthPage = () => {
         ) : (
           <>
             <GoogleSignIn onCredential={handleGoogle} onError={setError} />
-            <div className="auth-divider"><span>or use email</span></div>
 
             <form className="auth-form" onSubmit={handleSubmit}>
               <AnimatePresence initial={false}>
