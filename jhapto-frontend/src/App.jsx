@@ -15,6 +15,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import ProfilePage from './pages/ProfilePage';
 import CartPage from './pages/CartPage';
 import ReportsPage from './pages/ReportsPage';
+import AppUpdatePrompt from './components/AppUpdatePrompt';
 import { enablePush } from './utils/push';
 import { isNativeApp } from './utils/native';
 import './App.css';
@@ -59,6 +60,7 @@ function AppRoutes() {
   return (
     <div className="app">
       <NativePushSetup />
+      <AppUpdatePrompt />
       <AnimatePresence mode="wait" initial={false}>
       <motion.div key={pageKey} className="page-transition" {...pageMotion}>
       <Routes location={location}>

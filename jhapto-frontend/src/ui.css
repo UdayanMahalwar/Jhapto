@@ -782,3 +782,11 @@ textarea.input {
 .item-chosen { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; padding: 0.7rem 0.9rem; border-radius: 14px; background: var(--input-bg); }
 .item-new { padding: 0.9rem; border-radius: 16px; border: 1px dashed var(--primary-color); background: var(--primary-soft); gap: 0.75rem; }
 .item-new-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+
+/* ── App update prompt ──────────────────────────────────────── */
+.update-backdrop { align-items: flex-end; z-index: 1600; }
+.update-sheet { width: min(100%, 440px); display: grid; gap: 0.75rem; text-align: center; margin-bottom: max(1rem, env(safe-area-inset-bottom)); }
+.update-icon { width: 52px; height: 52px; margin: 0 auto; border-radius: 16px; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary-strong); }
+.update-list { text-align: left; margin: 0; padding: 0.75rem 1rem 0.75rem 2rem; border-radius: 14px; background: var(--input-bg); display: grid; gap: 0.35rem; font-size: 0.92rem; }
+.update-steps { margin: 0; font-size: 0.88rem; color: var(--text-secondary); }
+@media (min-width: 640px) { .update-backdrop { align-items: center; } }
