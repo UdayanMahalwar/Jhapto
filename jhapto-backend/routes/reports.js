@@ -6,6 +6,8 @@ const auth    = require('../middleware/auth');
 const v       = require('../utils/validate');
 const notify  = require('../utils/notify');
 
+router.param('id', v.intParam);   // ids must be numbers
+
 const MESSAGE_MAX = 1000;
 
 // The report if the logged-in student filed it, else undefined

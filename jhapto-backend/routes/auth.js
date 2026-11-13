@@ -6,10 +6,13 @@ const router  = express.Router();
 const bcrypt  = require('bcryptjs');
 const jwt     = require('jsonwebtoken');
 const db      = require('../config/db');
-const { loginLimiter, registerLimiter } = require('../middleware/rateLimit');
+const { loginLimiter, loginAccountLimiter, registerLimiter } = require('../middleware/rateLimit');
 const v       = require('../utils/validate');
 const auth    = require('../middleware/auth');
 const { verifyGoogleCredential, isAllowedEmail, allowedDomains } = require('../utils/google');
+
+// bcrypt hash of a random string: compared against when the email doesn't exist
+const DUMMY_HASH = '$2a$10$CwTycUXWue0Thq9StjUM0uJ8.8nQ3s8E5k0hYH7nEv0Gx0VdQ1v8W';
 
 const domainMessage = () => `Use your Thapar email (@${allowedDomains().join(', @')}).`;
 
@@ -126,7 +129,7 @@ router.post('/register', registerLimiter, async (req, res) => {
 
 // ── POST /api/auth/login ─────────────────────────────────────
 // Logs in a student and returns a JWT token
-router.post('/login', loginLimiter, async (req, res) => {
+router.post('/login', loginLimiter, loginAccountLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
@@ -142,7 +145,8 @@ router.post('/login', loginLimiter, async (req, res) => {
     if (student && !student.password_hash && student.google_sub) {
       return res.status(401).json({ message: 'This account uses Google sign-in. Tap "Continue with Google".' });
     }
-    const isMatch = student?.password_hash ? await bcrypt.compare(password, student.password_hash) : false;
+    // Always run bcrypt, even for unknown emails, so response time doesn't reveal which emails exist
+    const isMatch = await bcrypt.compare(password, student?.password_hash || DUMMY_HASH);
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid email or password.' });
     }
@@ -198,7 +202,7 @@ router.post('/google/complete', registerLimiter, async (req, res) => {
   const { signup_token, phone_no, hostel_id, floor_id } = req.body;
   let google;
   try {
-    google = jwt.verify(signup_token, process.env.JWT_SECRET).google_signup;
+    google = jwt.verify(signup_token, process.env.JWT_SECRET, { algorithms: ['HS256'] }).google_signup;
   } catch {
     google = null;
   }
@@ -347,10 +351,14 @@ router.patch('/me/password', auth, loginLimiter, async (req, res) => {
       return res.status(401).json({ message: 'Current password is incorrect.' });
     }
     const password_hash = await bcrypt.hash(new_password, 10);
+    // password_changed_at signs out every other device (their tokens are older)
     await db.query(
-      'UPDATE Student SET password_hash = ? WHERE student_id = ?', [password_hash, req.user.student_id]
+      `UPDATE Student SET password_hash = ?, password_changed_at = now() - interval '1 second' WHERE student_id = ?`,
+      [password_hash, req.user.student_id]
     );
-    res.json({ message: 'Password changed.' });
+    const [fresh] = await db.query(`${STUDENT_SESSION_SQL} WHERE s.student_id = ?`, [req.user.student_id]);
+    // a fresh token for this device, so the person changing it stays logged in
+    res.json({ message: 'Password changed. Other devices have been signed out.', ...sessionFor(fresh[0]) });
   } catch (err) {
     res.status(500).json({ message: 'Error changing password.', error: err.message });
   }

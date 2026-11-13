@@ -7,6 +7,9 @@ const db      = require('../config/db');
 const auth    = require('../middleware/auth');
 const notify  = require('../utils/notify');
 const realtime = require('../realtime');
+const v = require('../utils/validate');
+
+router.param('order_id', v.intParam);   // ids must be numbers
 
 // ── GET /api/messages/unread ─────────────────────────────
 // Unread chat messages for the logged-in student: total + one entry per chat

@@ -8,6 +8,8 @@ const db      = require('../config/db');
 const auth    = require('../middleware/auth');
 const v       = require('../utils/validate');
 
+router.param('id', v.intParam);   // ids must be numbers
+
 // ── GET /api/notifications ───────────────────────────────────
 // Latest 30 notifications + unread count
 router.get('/', auth, async (req, res) => {

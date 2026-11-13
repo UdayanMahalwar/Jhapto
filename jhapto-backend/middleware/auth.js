@@ -16,7 +16,7 @@ const authMiddleware = async (req, res, next) => {
 
   let decoded;
   try {
-    decoded = jwt.verify(token, process.env.JWT_SECRET);
+    decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
   } catch {
     return res.status(401).json({ message: 'Session expired. Please log in again.', code: 'INVALID_TOKEN' });
   }
@@ -27,10 +27,15 @@ const authMiddleware = async (req, res, next) => {
 
   try {
     const [rows] = await db.query(
-      'SELECT is_banned, name, floor_id, hostel_id FROM Student WHERE student_id = ?', [decoded.student_id]
+      'SELECT is_banned, name, floor_id, hostel_id, password_changed_at FROM Student WHERE student_id = ?', [decoded.student_id]
     );
     if (rows.length === 0) {
       return res.status(401).json({ message: 'Account no longer exists.', code: 'INVALID_TOKEN' });
+    }
+    // Tokens issued before the last password change are no longer valid
+    const changedAt = rows[0].password_changed_at;
+    if (changedAt && decoded.iat * 1000 < new Date(changedAt).getTime()) {
+      return res.status(401).json({ message: 'Your password was changed. Please log in again.', code: 'INVALID_TOKEN' });
     }
     if (rows[0].is_banned) {
       return res.status(403).json({ message: 'Your account has been banned. Contact admin.', code: 'ACCOUNT_BANNED' });

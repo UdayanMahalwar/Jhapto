@@ -11,7 +11,7 @@ import api from '../utils/api';
 
 
 const ProfilePage = () => {
-  const { user, logout, updateUser } = useContext(AuthContext);
+  const { user, logout, updateUser, startSession } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const [profile, setProfile] = useState(null);
@@ -93,6 +93,8 @@ const ProfilePage = () => {
     }
     try {
       const res = await api.patch('/auth/me/password', { current_password: pw.current_password, new_password: pw.new_password });
+      // other devices are signed out; keep this one logged in with the fresh token
+      if (res.data.token) startSession(res.data);
       setPw({ current_password: '', new_password: '', confirm: '' });
       setPwMsg({ text: res.data.message, type: 'success' });
     } catch (err) {
@@ -196,12 +198,12 @@ const ProfilePage = () => {
                   <input type="password" required autoComplete="current-password" value={pw.current_password} onChange={(e) => setPw({ ...pw, current_password: e.target.value })} className="input" />
                 </label>
                 <label className="field">
-                  <span>New password (min 6 characters)</span>
-                  <input type="password" required minLength={6} autoComplete="new-password" value={pw.new_password} onChange={(e) => setPw({ ...pw, new_password: e.target.value })} className="input" />
+                  <span>New password (min 8 characters)</span>
+                  <input type="password" required minLength={8} autoComplete="new-password" value={pw.new_password} onChange={(e) => setPw({ ...pw, new_password: e.target.value })} className="input" />
                 </label>
                 <label className="field">
                   <span>Confirm new password</span>
-                  <input type="password" required minLength={6} autoComplete="new-password" value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} className="input" />
+                  <input type="password" required minLength={8} autoComplete="new-password" value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} className="input" />
                 </label>
                 <button type="submit" className="btn btn-secondary">Change password</button>
               </form>

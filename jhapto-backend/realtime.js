@@ -33,7 +33,7 @@ async function authenticate(socket, next) {
   if (!token) return next(new Error('INVALID_TOKEN'));
   let decoded;
   try {
-    decoded = jwt.verify(token, process.env.JWT_SECRET);
+    decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
   } catch {
     return next(new Error('INVALID_TOKEN'));
   }

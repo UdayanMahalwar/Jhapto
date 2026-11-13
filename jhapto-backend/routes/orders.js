@@ -8,6 +8,8 @@ const auth    = require('../middleware/auth');
 const v       = require('../utils/validate');
 const realtime = require('../realtime');
 
+router.param('id', v.intParam);   // ids must be numbers
+
 const MAX_QTY_PER_ITEM = 100;
 const MAX_CART_LINES   = 20;
 
