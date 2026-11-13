@@ -68,7 +68,7 @@ function createApp() {
   app.use('/api/push',          require('./routes/push'));
 
   app.get('/api/config', (req, res) => {
-    res.set('Cache-Control', 'public, max-age=300').json(publicConfig());
+    res.set('Cache-Control', 'no-cache').json(publicConfig());
   });
 
   app.get('/api/health', (req, res) => {
