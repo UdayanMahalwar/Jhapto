@@ -83,14 +83,28 @@ const GoogleSignIn = ({ onCredential, onError }) => {
       setBusy(true);
       try {
         const SocialLogin = nativePlugin('SocialLogin');
-        await SocialLogin.initialize({ google: { webClientId: clientId, hostedDomain: domain } });
-        const res = await SocialLogin.login({ provider: 'google', options: { scopes: ['email', 'profile'] } });
+        // No hostedDomain filter here: the phone lists all its Google accounts and the
+        // server refuses non-Thapar ones with a clear message.
+        await SocialLogin.initialize({ google: { webClientId: clientId } });
+        // No custom `scopes`: email, profile and openid are the plugin's defaults, and
+        // passing scopes needs a modified MainActivity (the plugin rejects the call otherwise).
+        const res = await SocialLogin.login({ provider: 'google', options: {} });
         const idToken = res?.result?.idToken;
         if (!idToken) throw new Error('Google did not return a sign-in token.');
         await onCredential(idToken);
       } catch (err) {
         const msg = String(err?.message || err);
-        if (!/cancel/i.test(msg)) onError?.('Google sign-in failed. Please try again.');
+        console.warn('Google sign-in failed:', msg);
+        if (/cancel/i.test(msg)) return;
+        if (/no credentials|NoCredential/i.test(msg)) {
+          onError?.('No Google account found on this phone. Add your Thapar account in Settings → Accounts, then try again.');
+        } else if (/28444|Developer console|not configured/i.test(msg)) {
+          onError?.('Google sign-in isn’t set up for this app version yet. Use email and password for now.');
+        } else if (/network|timeout/i.test(msg)) {
+          onError?.('Couldn’t reach Google. Check your internet connection and try again.');
+        } else {
+          onError?.(`Google sign-in failed: ${msg.replace(/^Google Sign-In failed:\s*/i, '')}`);
+        }
       } finally {
         setBusy(false);
       }
