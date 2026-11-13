@@ -306,6 +306,12 @@
     font-size: 0.68rem;
     font-weight: 600;
     cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 0.25s ease;
+  }
+
+  .bottom-nav-item:active .bottom-nav-icon {
+    transform: scale(0.9);
   }
 
   .bottom-nav-item.active {

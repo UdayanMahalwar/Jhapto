@@ -227,3 +227,8 @@ html.theme-switching * {
   color: var(--primary-color);
   background: var(--primary-soft);
 }
+
+/* No grey flash when tapping buttons in the Android app / mobile browsers */
+button, a, [role="button"], [role="link"] {
+  -webkit-tap-highlight-color: transparent;
+}
