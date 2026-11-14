@@ -89,5 +89,10 @@ Verification: `npm test` covers the API, database triggers, security cases and l
 `npm run lint` checks frontend JSX and Hooks; `npm run build` builds production assets.
 `npm audit --omit=dev` checks production packages. The full development audit still
 reports the unpatched low-severity deepmerge advisory via Jest (GHSA-gcqx-w48m-w2h4);
-production dependencies do not include it. Fast Refresh export warnings and the build's
-bundle-size warning remain development/performance cleanup.
+production dependencies do not include it. Dependabot checks both npm lockfiles weekly.
+CI runs lint with zero warnings, database-backed tests, a production build, and dependency
+audits. Production findings of any severity and development findings of moderate severity
+or higher fail CI. Screens load on demand, and React is cached in a separate vendor chunk.
+
+Visible buyer and seller order screens refresh every 15 seconds and when the app regains focus.
+The refresh runs quietly without replacing the order list with a loading message.

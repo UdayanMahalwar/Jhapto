@@ -2,9 +2,10 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Check, MessageCircle, PackageCheck, Flag, Store, Inbox, Pencil, Trash2, RotateCcw } from 'lucide-react';
 import Header from '../components/Header';
-import { AuthContext } from '../contexts/AuthContext';
-import { useToast } from '../contexts/ToastContext';
+import { AuthContext } from '../contexts/auth';
+import { useToast } from '../contexts/toast';
 import api from '../utils/api';
+import usePageRefresh from '../hooks/usePageRefresh';
 import { uploadImage } from '../utils/upload';
 import OrderFilters from '../components/OrderFilters';
 import OrderCard from '../components/OrderCard';
@@ -95,6 +96,12 @@ const SellerDashboard = () => {
       console.error('Error fetching orders', err);
     }
   };
+
+  usePageRefresh(() => Promise.all([
+    fetchOrders(),
+    api.get('/orders/selling', { params: { status: 'Placed' } }).then((res) => setPendingCount(res.data.length)),
+    api.get('/listings/my').then((res) => setListings(res.data)),
+  ]));
 
   const switchOrderTab = (tab) => {
     setSearchParams(tab === 'history' ? { tab: 'history' } : {}, { replace: true });

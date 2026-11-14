@@ -5,7 +5,7 @@ import Header from '../components/Header';
 import StatusBadge from '../components/StatusBadge';
 import ReportThread from '../components/ReportThread';
 import EmptyState from '../components/EmptyState';
-import { AuthContext } from '../contexts/AuthContext';
+import { AuthContext } from '../contexts/auth';
 import api from '../utils/api';
 
 const POLL_MS = 10000;

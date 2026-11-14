@@ -6,7 +6,7 @@ import AppDownload from '../components/AppDownload';
 import { LogOut, Flag, ChevronRight } from 'lucide-react';
 import { enablePush, pushStatus } from '../utils/push';
 import { isNativeApp } from '../utils/native';
-import { AuthContext } from '../contexts/AuthContext';
+import { AuthContext } from '../contexts/auth';
 import api from '../utils/api';
 
 

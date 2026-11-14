@@ -1,10 +1,10 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { AuthContext } from './AuthContext';
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { AuthContext } from './auth';
 import api from '../utils/api';
 
 // Cart shared by the home page, the header and /cart. Saved per student in
 // localStorage so it survives navigation and reloads; cleared on logout.
-const CartContext = createContext(null);
+import { CartContext } from './cart';
 
 const storageKey = (user) => (user ? `cart:${user.student_id}` : null);
 
@@ -91,5 +91,3 @@ export const CartProvider = ({ children }) => {
     </CartContext.Provider>
   );
 };
-
-export const useCart = () => useContext(CartContext);

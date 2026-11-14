@@ -1,9 +1,9 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 
 // Light / dark theme. The choice is saved in localStorage; until the user picks,
 // it follows the operating system setting.
-const ThemeContext = createContext({ theme: 'light', toggleTheme: () => {} });
+import { ThemeContext } from './theme';
 
 const readSaved = () => {
   try {
@@ -72,5 +72,3 @@ export const ThemeProvider = ({ children }) => {
 
   return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>;
 };
-
-export const useTheme = () => useContext(ThemeContext);

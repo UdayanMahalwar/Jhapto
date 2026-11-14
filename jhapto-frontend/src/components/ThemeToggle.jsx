@@ -1,7 +1,7 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Moon, Sun } from 'lucide-react';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/theme';
 
 // Sun / moon button; the icon spins and swaps, the page reveals the new theme
 const ThemeToggle = ({ className = 'icon-btn' }) => {

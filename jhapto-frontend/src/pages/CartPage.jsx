@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
 import Header from '../components/Header';
 import EmptyState from '../components/EmptyState';
-import { AuthContext } from '../contexts/AuthContext';
-import { useCart } from '../contexts/CartContext';
-import { useToast } from '../contexts/ToastContext';
+import { AuthContext } from '../contexts/auth';
+import { useCart } from '../contexts/cart';
+import { useToast } from '../contexts/toast';
 
 const CartPage = () => {
   const { user, logout } = useContext(AuthContext);

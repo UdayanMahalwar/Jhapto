@@ -1,0 +1,48 @@
+name: Checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: jhapto
+          POSTGRES_PASSWORD: jhapto_ci
+          POSTGRES_DB: jhapto_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_USER: jhapto
+      DB_PASSWORD: jhapto_ci
+      DB_NAME: jhapto_test
+      VITE_REALTIME: 'false'
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            jhapto-mobile/package-lock.json
+      - run: npm ci
+      - run: npm run lint -- --max-warnings 0
+      - run: npm test -- --silent
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=low
+      # Keep reporting the low-severity, unpatched Jest/deepmerge issue;
+      # any new moderate-or-higher development finding fails this check.
+      - run: npm audit --audit-level=moderate
+      - run: npm audit --prefix jhapto-mobile --audit-level=low

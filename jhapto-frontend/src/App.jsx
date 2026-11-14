@@ -1,25 +1,28 @@
-import React, { useContext, useEffect } from 'react';
+import React, { useContext, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
-import { AuthProvider, AuthContext } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
+import { AuthContext } from './contexts/auth';
 import { CartProvider } from './contexts/CartContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { ThemeProvider } from './contexts/ThemeContext';
-import AuthPage from './pages/AuthPage';
-import AdminAuthPage from './pages/AdminAuthPage';
-import HomePage from './pages/HomePage';
-import MyOrdersPage from './pages/MyOrdersPage';
-import SellerDashboard from './pages/SellerDashboard';
-import ChatPage from './pages/ChatPage';
-import AdminDashboard from './pages/AdminDashboard';
-import ProfilePage from './pages/ProfilePage';
-import CartPage from './pages/CartPage';
-import ReportsPage from './pages/ReportsPage';
 import AppUpdatePrompt from './components/AppUpdatePrompt';
 import BottomNav from './components/BottomNav';
+import RouteBoundary from './components/RouteBoundary';
 import { enablePush } from './utils/push';
 import { isNativeApp } from './utils/native';
 import './App.css';
+
+const AuthPage = lazy(() => import('./pages/AuthPage'));
+const AdminAuthPage = lazy(() => import('./pages/AdminAuthPage'));
+const HomePage = lazy(() => import('./pages/HomePage'));
+const MyOrdersPage = lazy(() => import('./pages/MyOrdersPage'));
+const SellerDashboard = lazy(() => import('./pages/SellerDashboard'));
+const ChatPage = lazy(() => import('./pages/ChatPage'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const CartPage = lazy(() => import('./pages/CartPage'));
+const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
   const { user, admin, loading } = useContext(AuthContext);
@@ -67,6 +70,8 @@ function AppRoutes() {
       {/* new pages start at the top (after the old one has faded out) */}
       <AnimatePresence mode="wait" initial={false} onExitComplete={() => window.scrollTo(0, 0)}>
       <motion.div key={pageKey} className="page-transition" {...pageMotion}>
+      <RouteBoundary key={location.pathname}>
+      <Suspense fallback={<div className="container" role="status" aria-live="polite">Loading…</div>}>
       <Routes location={location}>
         <Route path="/login" element={<AuthPage />} />
         <Route path="/admin/login" element={<AdminAuthPage />} />
@@ -88,6 +93,8 @@ function AppRoutes() {
         <Route path="/admin" element={<Navigate to="/admin/login" />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
+      </Suspense>
+      </RouteBoundary>
       </motion.div>
       </AnimatePresence>
       <BottomNav />

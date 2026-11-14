@@ -4,7 +4,7 @@ import { ArrowLeft, Send, Lock } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import '../components/Chat.css';
 import Header from '../components/Header';
-import { AuthContext } from '../contexts/AuthContext';
+import { AuthContext } from '../contexts/auth';
 import api from '../utils/api';
 import { getSocket, REALTIME_ENABLED } from '../utils/socket';
 
