@@ -4,12 +4,14 @@ beforeAll(resetDb);
 afterAll(() => db.end());
 
 describe('registration', () => {
-  const valid = { name: 'Test User', email: 'test@tiet.ac.in', phone_no: '9123456780', password: 'secret1', hostel_id: 1, floor_id: 2 };
+  const valid = { name: 'Test User', email: 'test@thapar.edu', phone_no: '9123456780', password: 'secret123', hostel_id: 1, floor_id: 2 };
 
   test.each([
     [{ email: 'not-an-email' }, /valid email/],
+    [{ email: 'someone@gmail.com' }, /Thapar email/],
+    [{ email: 'test@tiet.ac.in' }, /Thapar email/],
     [{ phone_no: '12345' }, /10-digit/],
-    [{ password: '123' }, /at least 6/],
+    [{ password: "1234567" }, /at least 8/],
     [{ floor_id: 99 }, /floor does not belong/],
   ])('rejects bad input %o', async (patch, msg) => {
     const res = await api().post('/api/auth/register').send({ ...valid, ...patch });

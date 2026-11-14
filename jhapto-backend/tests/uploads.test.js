@@ -33,7 +33,7 @@ test('rejects non-images even when they claim to be PNGs', async () => {
   expect(res.body.message).toMatch(/PNG, JPEG, GIF or WebP/);
 });
 
-test('rejects files over 5 MB', async () => {
+test('rejects files over the 4 MB limit', async () => {
   const big = Buffer.concat([PNG, Buffer.alloc(5 * 1024 * 1024)]);
   const res = await api().post('/api/uploads').set(bearer(await login('aarav'))).attach('image', big, 'big.png');
   expect(res.status).toBe(413);

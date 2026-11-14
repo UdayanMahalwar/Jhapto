@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../contexts/AuthContext';
-import { useToast } from '../contexts/ToastContext';
-import { BarChart3, Package, Users, Flag, ShieldCheck, LogOut } from 'lucide-react';
+import { AuthContext } from '../contexts/auth';
+import { useToast } from '../contexts/toast';
+import { BarChart3, Package, Users, Flag, ShieldCheck, LogOut, Building2, MessageSquare } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
-import EmptyState from '../components/EmptyState';
+import ThemeToggle from '../components/ThemeToggle';
+import AdminReportChat from '../components/AdminReportChat';
+import AdminHostels from '../components/AdminHostels';
 import api from '../utils/api';
 
 const AdminDashboard = () => {
@@ -14,6 +16,7 @@ const AdminDashboard = () => {
   const [userReports, setUserReports] = useState([]);
   const [reportFilter, setReportFilter] = useState('Pending');
   const [proofModal, setProofModal] = useState(null); // { report_id, url } | null
+  const [chatReport, setChatReport] = useState(null);  // report whose conversation is open
   const [admins, setAdmins] = useState([]);
   const [newAdmin, setNewAdmin] = useState({ name: '', email: '', password: '' });
   const [adminFormMsg, setAdminFormMsg] = useState({ text: '', type: '' });
@@ -23,11 +26,7 @@ const AdminDashboard = () => {
   const toast = useToast();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchData();
-  }, [activeTab]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       if (activeTab === 'report') {
         const res = await api.get('/admin/report');
@@ -48,7 +47,9 @@ const AdminDashboard = () => {
     } catch (err) {
       console.error('Error fetching admin data', err);
     }
-  };
+  }, [activeTab]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleRemoveListing = async (listing) => {
     if (!window.confirm(`Remove "${listing.item_name}" listed by ${listing.seller_name}?`)) return;
@@ -127,11 +128,12 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-color)', color: 'white' }}>
-      <header className="glass-panel" style={{ padding: '1rem clamp(1rem, 4vw, 2rem)', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'space-between', alignItems: 'center', borderRadius: 0, borderTop: 0, borderLeft: 0, borderRight: 0 }}>
-        <h1 className="text-gradient" style={{ fontSize: 'clamp(1.4rem, 5vw, 1.9rem)', fontWeight: 800 }}>JHAPTO <span style={{ fontWeight: 500 }}>Admin</span></h1>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-color)', color: 'var(--text-primary)' }}>
+      <header style={{ background: 'var(--header-bg)', backdropFilter: 'blur(16px)', borderBottom: '1px solid var(--border-color)', position: 'sticky', top: 0, zIndex: 50, padding: '1rem clamp(1rem, 4vw, 2rem)', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'space-between', alignItems: 'center', borderRadius: 0, borderTop: 0, borderLeft: 0, borderRight: 0 }}>
+        <h1 style={{ fontSize: 'clamp(1.4rem, 5vw, 1.8rem)', fontWeight: 800, letterSpacing: '-0.06em' }}>jhapto<span style={{ color: 'var(--primary-color)' }}>.</span> <span style={{ fontWeight: 600, fontSize: '0.6em', letterSpacing: 0, color: 'var(--text-secondary)' }}>admin</span></h1>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <span style={{ fontWeight: 'bold' }}>{admin?.name || admin?.email}</span>
+          <ThemeToggle />
           <button onClick={handleLogout} className="btn btn-ghost btn-sm"><LogOut size={15} /> Log out</button>
         </div>
       </header>
@@ -143,6 +145,7 @@ const AdminDashboard = () => {
             ['listings', 'Listings', Package],
             ['students', 'Students', Users],
             ['userReports', 'User reports', Flag],
+            ['hostels', 'Hostels', Building2],
             ['admins', 'Admins', ShieldCheck],
           ].map(([key, label, Icon]) => (
             <button key={key} className="admin-tab" aria-current={activeTab === key ? 'page' : undefined} onClick={() => setActiveTab(key)}>
@@ -309,6 +312,10 @@ const AdminDashboard = () => {
                           ) : (
                             <button className="btn btn-ghost btn-sm" onClick={() => handleReportStatus(r.report_id, 'Pending')}>Reopen</button>
                           )}
+                          <button className="btn btn-ghost btn-sm" onClick={() => setChatReport(r)}>
+                            <MessageSquare size={14} /> {Number(r.message_count) > 0 ? `Chat (${r.message_count})` : 'Message'}
+                            {r.last_sender === 'student' && <span className="tab-count" title="Waiting for an admin reply">new</span>}
+                          </button>
                           <button className={`btn btn-sm ${r.reported_is_banned ? 'btn-secondary' : 'btn-danger'}`} onClick={() => handleBanFromReport(r)}>
                             {r.reported_is_banned ? 'Unban user' : 'Ban user'}
                           </button>
@@ -320,6 +327,8 @@ const AdminDashboard = () => {
               )}
             </div>
           )}
+
+          {activeTab === 'hostels' && <AdminHostels />}
 
           {activeTab === 'admins' && (
             <div>
@@ -364,6 +373,10 @@ const AdminDashboard = () => {
           )}
         </div>
       </div>
+
+      {chatReport && (
+        <AdminReportChat report={chatReport} onClose={() => { setChatReport(null); fetchData(); }} />
+      )}
 
       {proofModal && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setProofModal(null)}>

@@ -36,6 +36,9 @@ async function start() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.resolve(__dirname, 'jhapto-frontend/dist');
+    // Same page security headers Vercel adds (vercel.json)
+    const pageHeaders = require('./jhapto-backend/config/securityHeaders.json');
+    app.use((req, res, next) => { res.set(pageHeaders); next(); });
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       res.sendFile(path.resolve(distPath, 'index.html'));

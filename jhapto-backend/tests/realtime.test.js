@@ -99,3 +99,15 @@ test('banning a student drops their live connection', async () => {
   await dropped;
   await expect(open(await login('rohan').catch(() => 'x'))).rejects.toThrow();
 });
+
+
+test('a password change drops live chats and rejects the revoked token on reconnect', async () => {
+  const token = await login('karan');
+  const socket = await open(token);
+  const dropped = next(socket, 'disconnect');
+  const res = await api().patch('/api/auth/me/password').set(bearer(token))
+    .send({ current_password: 'password123', new_password: 'UpdatedPassword#1' }).expect(200);
+  await dropped;
+  await expect(open(token)).rejects.toThrow('INVALID_TOKEN');
+  await expect(open(res.body.token)).resolves.toBeDefined();
+});

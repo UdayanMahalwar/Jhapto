@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useContext, useMemo } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Check, MessageCircle, PackageCheck, Flag, Store, Inbox, Pencil, Trash2, RotateCcw } from 'lucide-react';
 import Header from '../components/Header';
-import { AuthContext } from '../contexts/AuthContext';
-import { useToast } from '../contexts/ToastContext';
+import { AuthContext } from '../contexts/auth';
+import { useToast } from '../contexts/toast';
 import api from '../utils/api';
+import usePageRefresh from '../hooks/usePageRefresh';
 import { uploadImage } from '../utils/upload';
 import OrderFilters from '../components/OrderFilters';
 import OrderCard from '../components/OrderCard';
@@ -12,6 +13,7 @@ import Tabs from '../components/Tabs';
 import EmptyState from '../components/EmptyState';
 import FilePicker from '../components/FilePicker';
 import StatusBadge from '../components/StatusBadge';
+import ItemPicker from '../components/ItemPicker';
 import ReportDialog from '../components/ReportDialog';
 import { STATUSES_FOR_TAB, EMPTY_FILTERS, orderFilterParams } from '../utils/orderFilters';
 
@@ -28,9 +30,11 @@ const SellerDashboard = () => {
   const [orders, setOrders] = useState([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [items, setItems] = useState([]);
+  const [categories, setCategories] = useState([]);
   // Order tab lives in the URL (?tab=history) so notifications can link to it
   const [searchParams, setSearchParams] = useSearchParams();
   const activeOrderTab = searchParams.get('tab') === 'history' ? 'history' : 'active';
+  const [prefillItem] = useState(() => searchParams.get('new_item') || '');
   const [photoInputKey, setPhotoInputKey] = useState(0);   // bump to reset the file picker
   const [newListing, setNewListing] = useState({ item_id: '', room_number: '', ...EMPTY_LISTING });
   const [creating, setCreating] = useState(false);
@@ -69,17 +73,16 @@ const SellerDashboard = () => {
 
   const fetchData = async () => {
     try {
-      const [listRes, itemsRes, pendingRes] = await Promise.all([
+      const [listRes, itemsRes, pendingRes, catRes] = await Promise.all([
         api.get('/listings/my'),
         api.get('/listings/items'),
         api.get('/orders/selling', { params: { status: 'Placed' } }),
+        api.get('/listings/categories'),
       ]);
       setListings(listRes.data);
       setItems(itemsRes.data);
       setPendingCount(pendingRes.data.length);
-      if (itemsRes.data.length > 0) {
-        setNewListing(prev => ({ ...prev, item_id: prev.item_id || itemsRes.data[0].item_id }));
-      }
+      setCategories(catRes.data);
     } catch (err) {
       console.error('Error fetching seller data', err);
     }
@@ -94,11 +97,11 @@ const SellerDashboard = () => {
     }
   };
 
-  // Dropdown grouped by category: { 'Beverages': [items…], … }
-  const itemsByCategory = useMemo(() => items.reduce((groups, item) => {
-    (groups[item.category_name] = groups[item.category_name] || []).push(item);
-    return groups;
-  }, {}), [items]);
+  usePageRefresh(() => Promise.all([
+    fetchOrders(),
+    api.get('/orders/selling', { params: { status: 'Placed' } }).then((res) => setPendingCount(res.data.length)),
+    api.get('/listings/my').then((res) => setListings(res.data)),
+  ]));
 
   const switchOrderTab = (tab) => {
     setSearchParams(tab === 'history' ? { tab: 'history' } : {}, { replace: true });
@@ -138,12 +141,17 @@ const SellerDashboard = () => {
 
   const handleAddListing = async (e) => {
     e.preventDefault();
+    if (!newListing.item_id && !newListing.new_item) {
+      toast('Choose an item, or add a new one.', 'error');
+      return;
+    }
     setCreating(true);
     try {
-      await api.post('/listings', newListing);
-      toast('Listing is live!');
+      const { new_item, item_id, ...rest } = newListing;
+      const res = await api.post('/listings', new_item ? { ...rest, new_item } : { ...rest, item_id });
+      toast(new_item ? `“${new_item.item_name.trim()}” added and listed!` : 'Listing is live!');
       // keep the item and room — sellers usually list several things from the same room
-      setNewListing(prev => ({ ...prev, ...EMPTY_LISTING }));
+      setNewListing(prev => ({ ...prev, ...EMPTY_LISTING, item_id: res.data.item_id, new_item: undefined }));
       setPhotoInputKey(k => k + 1);
       fetchData();
     } catch (err) {
@@ -203,16 +211,12 @@ const SellerDashboard = () => {
             <section className="card card-lg" aria-labelledby="add-listing">
               <h2 id="add-listing" className="section-heading">Sell something</h2>
               <form onSubmit={handleAddListing} className="stack">
-                <label className="field">
+                <div className="field">
                   <span>Item</span>
-                  <select className="input" value={newListing.item_id} onChange={(e) => set({ item_id: e.target.value })}>
-                    {Object.entries(itemsByCategory).map(([category, list]) => (
-                      <optgroup key={category} label={category}>
-                        {list.map(item => <option key={item.item_id} value={item.item_id}>{item.item_name} ({item.brand})</option>)}
-                      </optgroup>
-                    ))}
-                  </select>
-                </label>
+                  <ItemPicker items={items} categories={categories} initialQuery={prefillItem}
+                    value={{ item_id: newListing.item_id, new_item: newListing.new_item }}
+                    onChange={(v) => set({ item_id: v.item_id || '', new_item: v.new_item })} />
+                </div>
                 <div className="field-row">
                   <label className="field">
                     <span>MRP (₹)</span>

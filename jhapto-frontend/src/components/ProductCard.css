@@ -1,120 +1,136 @@
 .product-card {
   display: flex;
   flex-direction: column;
-  padding: 0.75rem;
-  transition: var(--transition);
-  position: relative;
-  overflow: hidden;
+  padding: 0.9rem;
+  border-radius: 26px;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.3s;
 }
 
 .product-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
-  border-color: rgba(69, 243, 255, 0.3);
+  box-shadow: var(--shadow-md);
 }
 
-.product-image-container {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  background: linear-gradient(135deg, rgba(69, 243, 255, 0.06), rgba(247, 37, 133, 0.06));
-  border-radius: 12px;
-  margin-bottom: 0.85rem;
+.product-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 32px;
+}
+
+.fav-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
 }
 
-.product-image-container img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.fav-btn:hover {
+  background: var(--surface-3);
 }
 
-.product-image-placeholder {
-  font-size: 3rem;
-  opacity: 0.85;
-  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.4));
+.fav-btn.on {
+  color: var(--secondary-color);
 }
 
 .product-floor {
-  position: absolute;
-  top: 0.5rem;
-  left: 0.5rem;
-  padding: 0.2rem 0.55rem;
+  margin-left: auto;
+  padding: 0.2rem 0.6rem;
   border-radius: 999px;
   font-size: 0.7rem;
-  font-weight: 700;
-  background: rgba(11, 12, 16, 0.75);
+  font-weight: 600;
+  background: var(--surface-3);
   color: var(--text-secondary);
-  backdrop-filter: blur(6px);
 }
 
 .product-floor.same {
-  background: rgba(69, 243, 255, 0.9);
-  color: #001014;
+  background: var(--primary-soft);
+  color: var(--primary-color);
+}
+
+.product-image {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.product-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 18px;
+}
+
+.product-emoji {
+  font-size: clamp(3.4rem, 7vw, 4.6rem);
+  filter: drop-shadow(0 16px 14px rgba(0, 0, 0, 0.18));
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.product-card:hover .product-emoji {
+  transform: translateY(-6px) rotate(-6deg) scale(1.08);
 }
 
 .product-stock {
   position: absolute;
-  bottom: 0.5rem;
-  left: 0.5rem;
+  bottom: 0;
+  left: 0;
   padding: 0.2rem 0.55rem;
   border-radius: 999px;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 700;
-  background: rgba(245, 185, 66, 0.9);
-  color: #1d1300;
+  background: color-mix(in srgb, var(--warning) 18%, var(--surface-color));
+  color: var(--warning);
 }
 
 .product-info {
   display: flex;
   flex-direction: column;
   flex: 1;
-  padding: 0 0.25rem 0.25rem;
+  padding: 0 0.2rem;
 }
 
 .product-name {
   font-size: 1.02rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.25;
-  margin-bottom: 0.2rem;
+  letter-spacing: -0.02em;
 }
 
 .product-seller {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--text-secondary);
-  margin: 0;
-}
-
-.product-rating {
-  margin-top: 0.3rem;
+  margin-top: 0.15rem;
 }
 
 .product-footer {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 0.5rem;
   margin-top: auto;
-  padding-top: 0.85rem;
+  padding-top: 0.75rem;
 }
 
 .product-price {
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: var(--primary-color);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   display: flex;
   align-items: baseline;
-  flex-wrap: wrap;
-  column-gap: 0.4rem;
-}
-
-.price-symbol {
-  font-size: 0.85em;
-  font-weight: 700;
-  margin-right: -0.3rem;   /* sits tight against the number despite the column gap */
+  gap: 0.35rem;
 }
 
 .product-mrp {
@@ -124,41 +140,53 @@
   text-decoration: line-through;
 }
 
-.add-btn {
-  display: inline-flex;
+.product-rating {
+  display: flex;
   align-items: center;
-  gap: 0.3rem;
-  background: rgba(69, 243, 255, 0.1);
-  color: var(--primary-color);
-  border: 1px solid rgba(69, 243, 255, 0.35);
-  height: 36px;
-  padding: 0 0.8rem;
-  border-radius: 10px;
-  font: inherit;
-  font-weight: 700;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: var(--transition);
+  gap: 0.25rem;
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
 }
 
-.add-btn:hover {
+.product-rating .star {
+  color: var(--star);
+}
+
+.product-rating strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.add-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
   background: var(--primary-color);
-  color: var(--bg-color);
-  box-shadow: 0 0 15px rgba(69, 243, 255, 0.4);
+  color: var(--on-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--neon-glow);
+  flex-shrink: 0;
 }
 
 .cart-stepper {
   display: inline-flex;
   align-items: center;
-  height: 36px;
-  border-radius: 10px;
+  height: 40px;
+  border-radius: 999px;
   background: var(--primary-color);
-  color: #001014;
-  font-weight: 800;
+  color: var(--on-primary);
+  font-weight: 700;
+  box-shadow: var(--neon-glow);
+  overflow: hidden;
 }
 
 .cart-stepper button {
-  width: 34px;
+  width: 32px;
   height: 100%;
   border: none;
   background: transparent;
@@ -170,11 +198,35 @@
 }
 
 .cart-stepper span {
-  min-width: 18px;
+  min-width: 16px;
   text-align: center;
+  display: inline-block;
 }
 
-/* Kept for other pages that still use these badge classes */
+/* Skeleton loading cards */
+.product-skeleton {
+  border-radius: 26px;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  padding: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.skeleton-block {
+  border-radius: 12px;
+  background: linear-gradient(100deg, var(--surface-3) 30%, var(--surface-2) 50%, var(--surface-3) 70%);
+  background-size: 300% 100%;
+  animation: shimmer 1.3s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+
+/* kept for pages that still use these */
 .badge {
   font-size: 0.7rem;
   font-weight: 700;
@@ -183,20 +235,15 @@
   text-transform: uppercase;
 }
 
-.badge-primary {
-  background: rgba(69, 243, 255, 0.2);
-  color: var(--primary-color);
-  border: 1px solid rgba(69, 243, 255, 0.3);
-}
-
 .badge-secondary {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--surface-3);
   color: var(--text-secondary);
 }
 
 @media (max-width: 480px) {
   .product-card {
-    padding: 0.55rem;
+    padding: 0.7rem;
+    border-radius: 22px;
   }
 
   .product-name {
@@ -204,22 +251,23 @@
   }
 
   .product-price {
-    font-size: 1.05rem;
+    font-size: 1rem;
   }
 
-  .add-btn span {
+  .product-mrp {
     display: none;
   }
 
-  .add-btn {
-    padding: 0 0.6rem;
+  .add-btn,
+  .cart-stepper {
+    height: 36px;
   }
 
-  .product-footer {
-    padding-top: 0.6rem;
+  .add-btn {
+    width: 36px;
   }
 
   .cart-stepper button {
-    width: 28px;
+    width: 26px;
   }
 }

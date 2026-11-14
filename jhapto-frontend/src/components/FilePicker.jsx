@@ -3,7 +3,7 @@ import { ImagePlus } from 'lucide-react';
 
 // Styled image picker with preview. The parent uploads the file in onChange
 // and passes the resulting URL back as `value`.
-const FilePicker = ({ value, uploading, onChange, onRemove, inputKey, label = 'Add a photo', hint = 'PNG, JPEG, GIF or WebP · max 5 MB', capture }) => (
+const FilePicker = ({ value, uploading, onChange, onRemove, inputKey, label = 'Add a photo', hint = 'PNG, JPEG, GIF or WebP · max 4 MB', capture }) => (
   <div className="row" style={{ flexWrap: 'nowrap' }}>
     <label className="file-picker" style={{ flex: 1, minWidth: 0, position: 'relative' }}>
       <input

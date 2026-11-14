@@ -1,8 +1,9 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import { disconnectSocket } from '../utils/socket';
+import { forgetPushToken } from '../utils/push';
 
-export const AuthContext = createContext();
+import { AuthContext } from './auth';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -22,15 +23,20 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
+  // Stores a student session ({ token, student }) from password or Google sign-in
+  const startSession = (data) => {
+    disconnectSocket();
+    localStorage.setItem('token', data.token);
+    localStorage.removeItem('admin');
+    localStorage.setItem('user', JSON.stringify(data.student));
+    setAdmin(null);
+    setUser(data.student);
+    return data;
+  };
+
   const loginUser = async (email, password) => {
     const res = await api.post('/auth/login', { email, password });
-    disconnectSocket();
-    localStorage.setItem('token', res.data.token);
-    localStorage.removeItem('admin');
-    localStorage.setItem('user', JSON.stringify(res.data.student));
-    setAdmin(null);
-    setUser(res.data.student);
-    return res.data;
+    return startSession(res.data);
   };
 
   const loginAdmin = async (email, password) => {
@@ -54,6 +60,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    forgetPushToken(localStorage.getItem('token'));
     disconnectSocket();
     // drop saved carts so the next person on this browser starts empty
     Object.keys(localStorage).filter(k => k.startsWith('cart:')).forEach(k => localStorage.removeItem(k));
@@ -65,7 +72,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, admin, loading, loginUser, loginAdmin, updateUser, logout }}>
+    <AuthContext.Provider value={{ user, admin, loading, loginUser, startSession, loginAdmin, updateUser, logout }}>
       {!loading && children}
     </AuthContext.Provider>
   );

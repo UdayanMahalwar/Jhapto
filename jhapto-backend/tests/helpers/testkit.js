@@ -1,9 +1,9 @@
 // Shared helpers for the API tests.
-const mysql   = require('mysql2/promise');
+const { Client } = require('pg');
 const request = require('supertest');
 const { createApp } = require('../../app');
 const db = require('../../config/db');
-const { buildDatabase } = require('../../scripts/lib/sqlRunner');
+const { buildDatabase } = require('../../scripts/lib/schema');
 const { connectionOptions } = require('../../config/dbOptions');
 
 // Seed data (jhapto_database.sql + migrations). Student ids 1-5 sell listings 1-5.
@@ -17,13 +17,14 @@ const STUDENTS = {
 const PASSWORD = 'password123';
 const ADMIN = { email: 'admin@jhapto.com', password: 'admin123' };
 
-// Drop and rebuild the test database from the real SQL files (~0.5s)
+// Drop and rebuild the test database from the real SQL file (~0.3s)
 async function resetDb() {
-  const conn = await mysql.createConnection(connectionOptions({ database: false }));
+  const client = new Client(connectionOptions());
+  await client.connect();
   try {
-    await buildDatabase(conn, process.env.DB_NAME, { drop: true });
+    await buildDatabase(client, { reset: true });
   } finally {
-    await conn.end();
+    await client.end();
   }
 }
 

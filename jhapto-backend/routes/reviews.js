@@ -10,6 +10,8 @@ const auth    = require('../middleware/auth');
 const v       = require('../utils/validate');
 const realtime = require('../realtime');
 
+router.param('id', v.intParam);   // ids must be numbers
+
 // ── POST /api/reviews ────────────────────────────────────────
 // Body: { order_id, rating (1-5), comment? }
 router.post('/', auth, async (req, res) => {

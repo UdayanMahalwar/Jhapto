@@ -47,7 +47,7 @@ describe('admin revenue report', () => {
     const admin = await adminLogin();
     await api().patch(`/api/admin/students/${STUDENTS.karan.id}/ban`).set(bearer(admin)).expect(200);
     const report = (await api().get('/api/admin/report').set(bearer(admin))).body;
-    expect(report.find(r => r.student_id === STUDENTS.karan.id)).toMatchObject({ is_banned: 1 });
+    expect(report.find(r => r.student_id === STUDENTS.karan.id)).toMatchObject({ is_banned: true });
     await api().patch(`/api/admin/students/${STUDENTS.karan.id}/unban`).set(bearer(admin)).expect(200);
   });
 });

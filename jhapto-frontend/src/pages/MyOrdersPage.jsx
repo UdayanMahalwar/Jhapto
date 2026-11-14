@@ -2,9 +2,10 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MessageCircle, Package, Star, Flag, X } from 'lucide-react';
 import Header from '../components/Header';
-import { AuthContext } from '../contexts/AuthContext';
-import { useToast } from '../contexts/ToastContext';
+import { AuthContext } from '../contexts/auth';
+import { useToast } from '../contexts/toast';
 import api from '../utils/api';
+import usePageRefresh from '../hooks/usePageRefresh';
 import OrderFilters from '../components/OrderFilters';
 import OrderCard from '../components/OrderCard';
 import Tabs from '../components/Tabs';
@@ -31,17 +32,19 @@ const MyOrdersPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, filters]);
 
-  const fetchOrders = async () => {
-    setLoading(true);
+  const fetchOrders = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const res = await api.get('/orders/my', { params: orderFilterParams(activeTab, filters) });
       setOrders(res.data);
     } catch (err) {
       console.error('Failed to fetch orders', err);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
+
+  usePageRefresh(() => fetchOrders(false));
 
   const switchTab = (tab) => {
     setSearchParams(tab === 'history' ? { tab: 'history' } : {}, { replace: true });

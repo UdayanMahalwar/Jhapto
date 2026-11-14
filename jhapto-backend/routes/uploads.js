@@ -6,7 +6,6 @@
 const express = require('express');
 const crypto  = require('crypto');
 const multer  = require('multer');
-const { rateLimit } = require('express-rate-limit');
 const auth    = require('../middleware/auth');
 const { MAX_IMAGE_BYTES } = require('../utils/validate');
 const { sniffImageType } = require('../utils/imageType');
@@ -19,14 +18,7 @@ const upload = multer({
   limits: { fileSize: MAX_IMAGE_BYTES, files: 1, fields: 0 },
 });
 
-const uploadLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  limit: 60,                               // 60 images per IP per hour
-  standardHeaders: 'draft-7',
-  legacyHeaders: false,
-  skip: () => process.env.RATE_LIMIT_DISABLED === 'true',
-  message: { message: 'Too many uploads. Try again later.' },
-});
+const { uploadLimiter } = require('../middleware/rateLimit');   // 60 images per student per hour
 
 // ── POST /api/uploads ────────────────────────────────────────
 // multipart/form-data with one file field named "image".
@@ -35,7 +27,7 @@ router.post('/', auth, uploadLimiter, (req, res) => {
   upload.single('image')(req, res, async (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(413).json({ message: 'Image must be under 5 MB.' });
+        return res.status(413).json({ message: 'Image must be under 4 MB.' });
       }
       return res.status(400).json({ message: 'Upload one image in a field named "image".' });
     }

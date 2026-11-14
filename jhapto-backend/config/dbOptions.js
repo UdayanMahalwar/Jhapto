@@ -1,38 +1,32 @@
 // config/dbOptions.js
-// MySQL connection settings shared by the app, the scripts and the tests.
+// PostgreSQL connection settings shared by the app, the scripts and the tests.
 //
-// Hosted MySQL (e.g. Aiven) requires TLS. Set one of:
-//   DB_SSL_CA_FILE=/path/to/ca.pem      (local scripts)
-//   DB_SSL_CA="-----BEGIN CERTIFICATE-----\n..."   (hosting dashboards; \n may be literal)
-// or DB_SSL=true to use TLS with the system's trusted CAs.
+// Either set DATABASE_URL (hosted, e.g. Neon: "postgresql://user:pass@host/db?sslmode=require")
+// or the separate DB_HOST / DB_PORT / DB_USER / DB_PASSWORD / DB_NAME values (local).
 
 require('./env');
-const fs = require('fs');
 
-function sslOptions() {
-  let ca = null;
-  if (process.env.DB_SSL_CA_FILE) {
-    ca = fs.readFileSync(process.env.DB_SSL_CA_FILE, 'utf8');
-  } else if (process.env.DB_SSL_CA) {
-    ca = process.env.DB_SSL_CA.replace(/\\n/g, '\n');
+function connectionOptions({ database } = {}) {
+  if (process.env.DATABASE_URL) {
+    const url = new URL(process.env.DATABASE_URL);
+    if (database) url.pathname = `/${database}`;
+    const needsSsl = /sslmode=(require|verify)/.test(url.search) || process.env.DB_SSL === 'true';
+    // node-postgres treats sslmode in the URL specially; pass TLS settings explicitly instead
+    url.searchParams.delete('sslmode');
+    url.searchParams.delete('channel_binding');
+    return {
+      connectionString: url.toString(),
+      ssl: needsSsl ? { rejectUnauthorized: true } : undefined,
+    };
   }
-  if (ca) return { ca, rejectUnauthorized: true };
-  if (process.env.DB_SSL === 'true') return { rejectUnauthorized: true };
-  return undefined;
-}
-
-// Options for mysql.createConnection / createPool. Pass { database: false } to
-// connect without selecting a database (needed to create it).
-function connectionOptions({ database = true } = {}) {
-  const options = {
+  return {
     host    : process.env.DB_HOST || 'localhost',
-    port    : Number(process.env.DB_PORT) || 3306,
-    user    : process.env.DB_USER || 'root',
+    port    : Number(process.env.DB_PORT) || 5432,
+    user    : process.env.DB_USER || 'jhapto',
     password: process.env.DB_PASSWORD || '',
-    ssl     : sslOptions(),
+    database: database || process.env.DB_NAME || 'jhapto',
+    ssl     : process.env.DB_SSL === 'true' ? { rejectUnauthorized: true } : undefined,
   };
-  if (database) options.database = process.env.DB_NAME || 'jhapto';
-  return options;
 }
 
 module.exports = { connectionOptions };
