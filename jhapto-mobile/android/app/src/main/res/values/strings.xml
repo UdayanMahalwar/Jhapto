@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Jhapto</string>
+    <string name="title_activity_main">Jhapto</string>
+    <string name="package_name">com.jhapto.app</string>
+    <string name="custom_url_scheme">com.jhapto.app</string>
+</resources>

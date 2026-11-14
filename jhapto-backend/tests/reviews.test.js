@@ -84,7 +84,7 @@ describe('notifications (created by triggers)', () => {
     const someoneElse = await login('aarav');
     await api().patch(`/api/notifications/${notifications[0].notification_id}/read`).set(bearer(someoneElse)).expect(200);
     const [row] = await sql('SELECT is_read FROM Notification WHERE notification_id = ?', [notifications[0].notification_id]);
-    expect(row.is_read).toBe(0);
+    expect(row.is_read).toBe(false);
 
     await api().patch('/api/notifications/read-all').set(bearer(buyer)).expect(200);
     expect((await api().get('/api/notifications').set(bearer(buyer))).body.unread_count).toBe(0);

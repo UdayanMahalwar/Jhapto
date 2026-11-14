@@ -4,7 +4,7 @@
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PHONE_RE = /^[6-9]\d{9}$/;               // Indian 10-digit mobile
 const UPLOAD_URL_RE = /^\/uploads\/([0-9a-f]{32}\.(png|jpg|gif|webp))$/;
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;       // 5 MB per uploaded image
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;       // 4 MB per image (Vercel caps request bodies at 4.5 MB)
 
 const isNonEmptyString = (v, max) =>
   typeof v === 'string' && v.trim().length > 0 && v.trim().length <= max;
@@ -36,10 +36,19 @@ const isOptionalImage = (v) => {
   return /^https?:\/\/[^\s"'<>]+$/i.test(v);
 };
 
-const MIN_PASSWORD = 6;
-const isPassword = (v) => typeof v === 'string' && v.length >= MIN_PASSWORD && v.length <= 72;
+// router.param handler: route ids must be positive integers, otherwise 400
+// (stops junk like "abc" or "1' OR 1=1" from reaching the database at all)
+const intParam = (req, res, next, value) => {
+  if (!isIntInRange(value, 1, 2147483647) || !/^\d+$/.test(String(value))) {
+    return res.status(400).json({ message: 'Invalid id.' });
+  }
+  next();
+};
+
+const MIN_PASSWORD = 8;
+const isPassword = (v) => typeof v === 'string' && v.length >= MIN_PASSWORD && Buffer.byteLength(v, 'utf8') <= 72;
 
 module.exports = {
   isNonEmptyString, isEmail, isPhone, isIntInRange, isPrice, isOptionalImage, isPassword,
-  MIN_PASSWORD, MAX_IMAGE_BYTES,
+  MIN_PASSWORD, MAX_IMAGE_BYTES, intParam,
 };

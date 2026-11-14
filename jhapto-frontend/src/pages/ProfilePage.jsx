@@ -2,12 +2,16 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import StarRating from '../components/StarRating';
-import { AuthContext } from '../contexts/AuthContext';
+import AppDownload from '../components/AppDownload';
+import { LogOut, Flag, ChevronRight } from 'lucide-react';
+import { enablePush, pushStatus } from '../utils/push';
+import { isNativeApp } from '../utils/native';
+import { AuthContext } from '../contexts/auth';
 import api from '../utils/api';
 
 
 const ProfilePage = () => {
-  const { user, logout, updateUser } = useContext(AuthContext);
+  const { user, logout, updateUser, startSession } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const [profile, setProfile] = useState(null);
@@ -19,6 +23,30 @@ const ProfilePage = () => {
   const [pwMsg, setPwMsg] = useState({ text: '', type: '' });
 
   const [reviews, setReviews] = useState([]);
+  const [push, setPush] = useState('unsupported');   // granted | prompt | denied | unsupported
+  const [alertMsg, setAlertMsg] = useState('');
+
+  useEffect(() => { pushStatus().then(setPush).catch(() => {}); }, []);
+
+  const toggleEmail = async () => {
+    const next = !profile.email_notifications;
+    setProfile((p) => ({ ...p, email_notifications: next }));
+    try {
+      await api.patch('/auth/me', { email_notifications: next });
+      setAlertMsg(next ? 'Email alerts on.' : 'Email alerts off.');
+    } catch {
+      setProfile((p) => ({ ...p, email_notifications: !next }));
+      setAlertMsg('Could not change email alerts.');
+    }
+  };
+
+  const turnOnPush = async () => {
+    const result = await enablePush((link) => navigate(link));
+    setPush(result === 'granted' ? 'granted' : await pushStatus());
+    setAlertMsg(result === 'granted' ? 'Notifications on for this device.'
+      : result === 'denied' ? 'Notifications are blocked. Allow them in your browser or phone settings.'
+        : 'This browser can’t show notifications.');
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -65,6 +93,8 @@ const ProfilePage = () => {
     }
     try {
       const res = await api.patch('/auth/me/password', { current_password: pw.current_password, new_password: pw.new_password });
+      // other devices are signed out; keep this one logged in with the fresh token
+      if (res.data.token) startSession(res.data);
       setPw({ current_password: '', new_password: '', confirm: '' });
       setPwMsg({ text: res.data.message, type: 'success' });
     } catch (err) {
@@ -80,6 +110,10 @@ const ProfilePage = () => {
           <div>
             <h1 className="page-title">My Profile</h1>
             <p className="page-subtitle">Your details, password and seller rating.</p>
+          </div>
+          <div className="page-header-actions">
+            <AppDownload />
+            <button className="btn btn-ghost" onClick={logout}><LogOut size={16} /> Log out</button>
           </div>
         </div>
 
@@ -116,6 +150,44 @@ const ProfilePage = () => {
             </div>
 
             <div className="card card-lg">
+              <h2 className="section-heading">Alerts &amp; reports</h2>
+              {alertMsg && <div className="alert alert-success" role="status" style={{ marginBottom: '0.75rem' }}>{alertMsg}</div>}
+              <div className="setting-row">
+                <div className="setting-row-text">
+                  <strong>Email alerts</strong>
+                  <span className="muted small">New orders, order updates, ratings and replies to your reports, sent to {profile.email}.</span>
+                </div>
+                <button type="button" className="switch" role="switch" aria-checked={Boolean(profile.email_notifications)}
+                  aria-label="Email alerts" onClick={toggleEmail} />
+              </div>
+              <div className="setting-row">
+                <div className="setting-row-text">
+                  <strong>{isNativeApp() ? 'Phone notifications' : 'Browser notifications'}</strong>
+                  <span className="muted small">
+                    {push === 'granted' ? 'On for this device.'
+                      : push === 'denied' ? 'Blocked — allow notifications for Jhapto in your settings.'
+                        : push === 'unsupported' ? 'Not available here. Get the Android app for phone alerts.'
+                          : 'Get an alert the moment something happens.'}
+                  </span>
+                </div>
+                {push === 'prompt' && <button type="button" className="btn btn-primary btn-sm" onClick={turnOnPush}>Turn on</button>}
+              </div>
+              <button type="button" className="setting-row report-link" onClick={() => navigate('/reports')}>
+                <span className="setting-row-text">
+                  <strong><Flag size={14} /> My reports</strong>
+                  <span className="muted small">Follow your reports and talk to the admins.</span>
+                </span>
+                <ChevronRight size={18} />
+              </button>
+            </div>
+
+            {!profile.has_password ? (
+              <div className="card card-lg">
+                <h2 className="section-heading">Sign-in</h2>
+                <p className="muted">You sign in with your Google account ({profile.email}), so there's no password to manage.</p>
+              </div>
+            ) : (
+            <div className="card card-lg">
               <h2 className="section-heading">Change password</h2>
               {pwMsg.text && (
                 <div className={`alert ${pwMsg.type === 'error' ? 'alert-error' : 'alert-success'}`} role="status" style={{ marginBottom: '1rem' }}>{pwMsg.text}</div>
@@ -126,16 +198,17 @@ const ProfilePage = () => {
                   <input type="password" required autoComplete="current-password" value={pw.current_password} onChange={(e) => setPw({ ...pw, current_password: e.target.value })} className="input" />
                 </label>
                 <label className="field">
-                  <span>New password (min 6 characters)</span>
-                  <input type="password" required minLength={6} autoComplete="new-password" value={pw.new_password} onChange={(e) => setPw({ ...pw, new_password: e.target.value })} className="input" />
+                  <span>New password (min 8 characters)</span>
+                  <input type="password" required minLength={8} autoComplete="new-password" value={pw.new_password} onChange={(e) => setPw({ ...pw, new_password: e.target.value })} className="input" />
                 </label>
                 <label className="field">
                   <span>Confirm new password</span>
-                  <input type="password" required minLength={6} autoComplete="new-password" value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} className="input" />
+                  <input type="password" required minLength={8} autoComplete="new-password" value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} className="input" />
                 </label>
                 <button type="submit" className="btn btn-secondary">Change password</button>
               </form>
             </div>
+            )}
 
             <div className="card card-lg" style={{ gridColumn: '1 / -1' }}>
               <h2 className="section-heading" style={{ marginBottom: '0.5rem' }}>My seller rating</h2>

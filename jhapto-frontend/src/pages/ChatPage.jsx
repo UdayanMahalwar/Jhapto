@@ -4,9 +4,9 @@ import { ArrowLeft, Send, Lock } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import '../components/Chat.css';
 import Header from '../components/Header';
-import { AuthContext } from '../contexts/AuthContext';
+import { AuthContext } from '../contexts/auth';
 import api from '../utils/api';
-import { getSocket } from '../utils/socket';
+import { getSocket, REALTIME_ENABLED } from '../utils/socket';
 
 const ChatPage = () => {
   const { order_id } = useParams();
@@ -80,6 +80,13 @@ const ChatPage = () => {
     };
   }, [order_id, fetchMessages, user.student_id, blocked]);
 
+  // Without live updates (serverless hosting), check for new messages every few seconds
+  useEffect(() => {
+    if (REALTIME_ENABLED || blocked) return undefined;
+    const t = setInterval(() => { if (!document.hidden) fetchMessages(); }, 3000);
+    return () => clearInterval(t);
+  }, [fetchMessages, blocked]);
+
   // Keep the newest message in view
   useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
@@ -137,9 +144,13 @@ const ChatPage = () => {
           </div>
           <div className="chat-header-side">
             {orderStatus && <StatusBadge status={orderStatus} />}
-            <span className={`chat-live ${live ? 'on' : ''}`} title={live ? 'New messages appear instantly' : 'Reconnecting…'}>
-              {live ? 'Live' : 'Connecting…'}
-            </span>
+            {REALTIME_ENABLED ? (
+              <span className={`chat-live ${live ? 'on' : ''}`} title={live ? 'New messages appear instantly' : 'Reconnecting…'}>
+                {live ? 'Live' : 'Connecting…'}
+              </span>
+            ) : (
+              <span className="chat-live on" title="New messages are checked every few seconds">Auto-refresh</span>
+            )}
           </div>
         </div>
 

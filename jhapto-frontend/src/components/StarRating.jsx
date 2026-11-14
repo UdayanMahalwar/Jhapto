@@ -20,8 +20,8 @@ const StarRating = ({ value = 0, count, onChange, size = 14 }) => {
         const star = (
           <Star
             size={size}
-            fill={filled ? '#f1c40f' : 'transparent'}
-            color={filled ? '#f1c40f' : 'rgba(255,255,255,0.35)'}
+            fill={filled ? 'var(--star)' : 'transparent'}
+            color={filled ? 'var(--star)' : 'var(--text-secondary)'}
           />
         );
         return interactive ? (

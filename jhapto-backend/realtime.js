@@ -23,7 +23,7 @@ let io = null;
 // Same query routes/reports.js uses to find an order's two parties
 const ORDER_PARTIES_SQL =
   `SELECT o.buyer_id, l.seller_id
-   FROM \`Order\` o
+   FROM "Order" o
    JOIN Order_Item oi ON o.order_id    = oi.order_id
    JOIN Listing    l  ON oi.listing_id = l.listing_id
    WHERE o.order_id = ? LIMIT 1`;
@@ -33,16 +33,17 @@ async function authenticate(socket, next) {
   if (!token) return next(new Error('INVALID_TOKEN'));
   let decoded;
   try {
-    decoded = jwt.verify(token, process.env.JWT_SECRET);
+    decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
   } catch {
     return next(new Error('INVALID_TOKEN'));
   }
   if (!decoded.student_id) return next(new Error('INVALID_TOKEN'));
   try {
     const [rows] = await db.query(
-      'SELECT is_banned, name, floor_id, hostel_id FROM Student WHERE student_id = ?', [decoded.student_id]
+      'SELECT is_banned, name, floor_id, hostel_id, session_version FROM Student WHERE student_id = ?', [decoded.student_id]
     );
     if (rows.length === 0) return next(new Error('INVALID_TOKEN'));
+    if ((decoded.session_version ?? 0) !== rows[0].session_version) return next(new Error('INVALID_TOKEN'));
     if (rows[0].is_banned) return next(new Error('ACCOUNT_BANNED'));
   } catch {
     return next(new Error('SERVER_ERROR'));
