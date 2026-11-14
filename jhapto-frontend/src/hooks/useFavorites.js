@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useState } from 'react';
-import { AuthContext } from '../contexts/AuthContext';
+import { AuthContext } from '../contexts/auth';
 
 // Hearted listings, saved per student in this browser
 export default function useFavorites() {

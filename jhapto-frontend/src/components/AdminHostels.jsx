@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useToast } from '../contexts/ToastContext';
+import { useToast } from '../contexts/toast';
 import api from '../utils/api';
 
 // Admin › Hostels: list hostels, add a hostel with its floors, add floors to one

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { getConfig } from '../utils/config';
 import { isNativeApp, nativePlugin } from '../utils/native';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/theme';
 
 const GSI_SRC = 'https://accounts.google.com/gsi/client';
 let gsiPromise = null;

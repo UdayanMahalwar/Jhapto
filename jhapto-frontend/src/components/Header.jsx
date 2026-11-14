@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Search, MapPin, ShoppingBag, LogOut, X } from 'lucide-react';
-import { NAV } from './BottomNav';
+import { NAV } from '../utils/navigation';
 import NotificationBell from './NotificationBell';
 import ThemeToggle from './ThemeToggle';
 import CountBadge from './CountBadge';
-import { useCart } from '../contexts/CartContext';
+import { useCart } from '../contexts/cart';
 import './Header.css';
 
 const initials = (name = '') => name.split(' ').map(p => p[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();

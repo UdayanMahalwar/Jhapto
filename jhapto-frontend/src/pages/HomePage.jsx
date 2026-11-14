@@ -7,9 +7,9 @@ import HeroBanner from '../components/HeroBanner';
 import CategoryList, { SAVED } from '../components/CategoryList';
 import ProductCard from '../components/ProductCard';
 import FloatingCart from '../components/FloatingCart';
-import { AuthContext } from '../contexts/AuthContext';
-import { useCart } from '../contexts/CartContext';
-import { useToast } from '../contexts/ToastContext';
+import { AuthContext } from '../contexts/auth';
+import { useCart } from '../contexts/cart';
+import { useToast } from '../contexts/toast';
 import useFavorites from '../hooks/useFavorites';
 import api from '../utils/api';
 

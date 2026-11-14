@@ -1,18 +1,13 @@
 import React, { useContext } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Home, Package, Store, ShoppingBag, User } from 'lucide-react';
+import { ShoppingBag, User } from 'lucide-react';
 import CountBadge from './CountBadge';
-import { AuthContext } from '../contexts/AuthContext';
-import { useCart } from '../contexts/CartContext';
+import { AuthContext } from '../contexts/auth';
+import { useCart } from '../contexts/cart';
 import './Header.css';
 
-// Main sections (the header shows the first three on desktop)
-export const NAV = [
-  { to: '/', label: 'Home', icon: Home, match: (p) => p === '/' },
-  { to: '/orders', label: 'Orders', icon: Package, match: (p) => p.startsWith('/orders') || p.startsWith('/chat') },
-  { to: '/seller', label: 'Sell', icon: Store, match: (p) => p.startsWith('/seller') },
-];
+import { NAV } from '../utils/navigation';
 
 const TABS = [
   ...NAV,

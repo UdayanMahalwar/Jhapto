@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../contexts/AuthContext';
-import { useToast } from '../contexts/ToastContext';
+import { AuthContext } from '../contexts/auth';
+import { useToast } from '../contexts/toast';
 import { BarChart3, Package, Users, Flag, ShieldCheck, LogOut, Building2, MessageSquare } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import ThemeToggle from '../components/ThemeToggle';

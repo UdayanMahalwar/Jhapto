@@ -4,7 +4,7 @@ import { Smartphone } from 'lucide-react';
 export const APK_URL = '/downloads/jhapto.apk';
 
 // The Android app adds "JhaptoAndroid" to its user agent; don't offer the app inside the app
-export const inAndroidApp = () => typeof navigator !== 'undefined' && navigator.userAgent.includes('JhaptoAndroid');
+const inAndroidApp = () => typeof navigator !== 'undefined' && navigator.userAgent.includes('JhaptoAndroid');
 
 // "Get the Android app" link to the APK hosted on this site
 const AppDownload = ({ className = '' }) => {

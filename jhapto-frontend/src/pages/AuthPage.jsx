@@ -1,6 +1,6 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { AuthContext } from '../contexts/AuthContext';
+import { AuthContext } from '../contexts/auth';
 import api from '../utils/api';
 import { getConfig } from '../utils/config';
 import { readAuthMessage, clearAuthMessage } from '../utils/authMessage';

@@ -1,9 +1,9 @@
-import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 
 // App-wide toast messages (replaces window.alert and the per-page notification banners)
-const ToastContext = createContext(() => {});
+import { ToastContext } from './toast';
 
 export const ToastProvider = ({ children }) => {
   const [toast, setToast] = useState(null);   // { id, message, type }
@@ -50,4 +50,3 @@ export const ToastProvider = ({ children }) => {
 };
 
 // const toast = useToast(); toast('Saved'); toast('Something failed', 'error');
-export const useToast = () => useContext(ToastContext);
