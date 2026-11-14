@@ -77,3 +77,17 @@ Release signing reads `jhapto-mobile/android/keystore.properties` (kept out of g
 - Every route checks ownership (buyer / seller / reporter / admin); ids must be numbers; SQL is always parameterised; uploads are checked by their bytes, not their name.
 - Browser protections: strict Content-Security-Policy, no framing, `nosniff`, HSTS, and an API that only Jhapto's own sites can call. Server errors never send internal details to the browser.
 - `jhapto-backend/tests/security.test.js` keeps these attacks failing.
+
+### Session revocation update
+
+Run `npm run db:migrate` before deploying code that uses `student.session_version`.
+Password changes increment this version atomically, reject concurrent reuse of the old
+password, disconnect live chats, and invalidate older tokens even within the same second.
+Previously changed passwords invalidate legacy tokens when migration 003 runs.
+
+Verification: `npm test` covers the API, database triggers, security cases and live chats;
+`npm run lint` checks frontend JSX and Hooks; `npm run build` builds production assets.
+`npm audit --omit=dev` checks production packages. The full development audit still
+reports the unpatched low-severity deepmerge advisory via Jest (GHSA-gcqx-w48m-w2h4);
+production dependencies do not include it. Fast Refresh export warnings and the build's
+bundle-size warning remain development/performance cleanup.

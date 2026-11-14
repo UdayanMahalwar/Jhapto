@@ -27,14 +27,13 @@ const authMiddleware = async (req, res, next) => {
 
   try {
     const [rows] = await db.query(
-      'SELECT is_banned, name, floor_id, hostel_id, password_changed_at FROM Student WHERE student_id = ?', [decoded.student_id]
+      'SELECT is_banned, name, floor_id, hostel_id, session_version FROM Student WHERE student_id = ?', [decoded.student_id]
     );
     if (rows.length === 0) {
       return res.status(401).json({ message: 'Account no longer exists.', code: 'INVALID_TOKEN' });
     }
-    // Tokens issued before the last password change are no longer valid
-    const changedAt = rows[0].password_changed_at;
-    if (changedAt && decoded.iat * 1000 < new Date(changedAt).getTime()) {
+    // A password change increments the version and invalidates every older token
+    if ((decoded.session_version ?? 0) !== rows[0].session_version) {
       return res.status(401).json({ message: 'Your password was changed. Please log in again.', code: 'INVALID_TOKEN' });
     }
     if (rows[0].is_banned) {

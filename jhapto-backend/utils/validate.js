@@ -46,7 +46,7 @@ const intParam = (req, res, next, value) => {
 };
 
 const MIN_PASSWORD = 8;
-const isPassword = (v) => typeof v === 'string' && v.length >= MIN_PASSWORD && v.length <= 72;
+const isPassword = (v) => typeof v === 'string' && v.length >= MIN_PASSWORD && Buffer.byteLength(v, 'utf8') <= 72;
 
 module.exports = {
   isNonEmptyString, isEmail, isPhone, isIntInRange, isPrice, isOptionalImage, isPassword,

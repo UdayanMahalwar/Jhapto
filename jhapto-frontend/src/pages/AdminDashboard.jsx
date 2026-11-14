@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { BarChart3, Package, Users, Flag, ShieldCheck, LogOut, Building2, MessageSquare } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import ThemeToggle from '../components/ThemeToggle';
-import EmptyState from '../components/EmptyState';
 import AdminReportChat from '../components/AdminReportChat';
 import AdminHostels from '../components/AdminHostels';
 import api from '../utils/api';
@@ -27,11 +26,7 @@ const AdminDashboard = () => {
   const toast = useToast();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchData();
-  }, [activeTab]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       if (activeTab === 'report') {
         const res = await api.get('/admin/report');
@@ -52,7 +47,9 @@ const AdminDashboard = () => {
     } catch (err) {
       console.error('Error fetching admin data', err);
     }
-  };
+  }, [activeTab]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleRemoveListing = async (listing) => {
     if (!window.confirm(`Remove "${listing.item_name}" listed by ${listing.seller_name}?`)) return;

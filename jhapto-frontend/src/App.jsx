@@ -48,9 +48,10 @@ const pageMotion = {
 function NativePushSetup() {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
+  const studentId = user?.student_id;
   useEffect(() => {
-    if (user && isNativeApp()) enablePush((link) => navigate(link));
-  }, [user?.student_id]);
+    if (studentId && isNativeApp()) enablePush((link) => navigate(link));
+  }, [studentId, navigate]);
   return null;
 }
 

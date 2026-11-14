@@ -35,11 +35,12 @@ describe('forged and stale logins', () => {
 
   test('changing the password signs out other devices but keeps this one', async () => {
     const otherDevice = await login('priya');
-    await new Promise((r) => setTimeout(r, 1100));   // tokens carry whole-second timestamps
     const thisDevice = await login('priya');
     const res = await api().patch('/api/auth/me/password').set(bearer(thisDevice))
       .send({ current_password: 'password123', new_password: 'NewPassword#1' }).expect(200);
     expect(res.body.token).toBeTruthy();
+    expect(jwt.decode(res.body.token).session_version).toBe(1);
+    expect((await api().get('/api/auth/me').set(bearer(thisDevice))).status).toBe(401);
     expect((await api().get('/api/auth/me').set(bearer(otherDevice))).status).toBe(401);
     await api().get('/api/auth/me').set(bearer(res.body.token)).expect(200);
     // and the new password is what works now
@@ -142,4 +143,23 @@ describe('abuse limits', () => {
     await api().post('/api/listings').set(bearer(token)).send({ ...base, new_item: { item_name: 'spam item 7', category_id: 1 } }).expect(201);
     process.env.RATE_LIMIT_DISABLED = 'false';
   });
+});
+
+
+test('password validation respects bcrypt UTF-8 byte limits', async () => {
+  // 24 emoji fit the character limit but exceed bcrypt's 72-byte input limit.
+  const res = await api().post('/api/auth/register').send({
+    name: 'Unicode Password', email: 'unicodepw@thapar.edu', phone_no: '9000000022',
+    password: '🔒'.repeat(24), hostel_id: 1, floor_id: 1,
+  });
+  expect(res.status).toBe(400);
+});
+
+test('concurrent password changes cannot both reuse the same current password', async () => {
+  const token = await login('aarav');
+  const results = await Promise.all(['NewPassword#A', 'NewPassword#B'].map(new_password =>
+    api().patch('/api/auth/me/password').set(bearer(token))
+      .send({ current_password: 'password123', new_password })));
+  expect(results.map(r => r.status).sort()).toEqual([200, 401]);
+  await api().get('/api/auth/me').set(bearer(results.find(r => r.status === 200).body.token)).expect(200);
 });

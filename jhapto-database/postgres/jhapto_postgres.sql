@@ -44,6 +44,7 @@ CREATE TABLE student (
     floor_id      INT NOT NULL REFERENCES floor(floor_id),
     is_banned     BOOLEAN NOT NULL DEFAULT FALSE,
     email_notifications BOOLEAN NOT NULL DEFAULT TRUE,
+    session_version INT NOT NULL DEFAULT 0,          -- incremented to revoke sessions without timestamp races
     password_changed_at TIMESTAMPTZ,                  -- sessions issued before this are rejected
     avg_rating    NUMERIC(3,2),                       -- maintained by trg_review_after_insert
     rating_count  INT NOT NULL DEFAULT 0,
