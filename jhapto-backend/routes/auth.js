@@ -9,6 +9,7 @@ const db      = require('../config/db');
 const { loginLimiter, loginAccountLimiter, registerLimiter } = require('../middleware/rateLimit');
 const v       = require('../utils/validate');
 const auth    = require('../middleware/auth');
+const realtime = require('../realtime');
 const { verifyGoogleCredential, isAllowedEmail, allowedDomains } = require('../utils/google');
 
 // bcrypt hash of a random string: compared against when the email doesn't exist
@@ -19,7 +20,7 @@ const domainMessage = () => `Use your Thapar email (@${allowedDomains().join(', 
 // Login token + the student details the frontend keeps in AuthContext
 function sessionFor(student) {
   const token = jwt.sign(
-    { student_id: student.student_id, name: student.name, floor_id: student.floor_id },
+    { student_id: student.student_id, name: student.name, floor_id: student.floor_id, session_version: student.session_version },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
   );
@@ -38,7 +39,7 @@ function sessionFor(student) {
 }
 
 const STUDENT_SESSION_SQL =
-  `SELECT s.student_id, s.name, s.email, s.password_hash, s.google_sub, s.floor_id, s.hostel_id, s.is_banned,
+  `SELECT s.student_id, s.name, s.email, s.password_hash, s.google_sub, s.floor_id, s.hostel_id, s.is_banned, s.session_version,
           f.floor_number, h.hostel_name
    FROM Student s
    JOIN Floor  f ON s.floor_id  = f.floor_id
@@ -99,7 +100,7 @@ router.post('/register', registerLimiter, async (req, res) => {
     return res.status(400).json({ message: 'Enter a valid 10-digit mobile number.' });
   }
   if (!v.isPassword(password)) {
-    return res.status(400).json({ message: `Password must be at least ${v.MIN_PASSWORD} characters.` });
+    return res.status(400).json({ message: `Password must be at least ${v.MIN_PASSWORD} characters and at most 72 UTF-8 bytes.` });
   }
   if (!v.isIntInRange(hostel_id, 1, 1e6) || !v.isIntInRange(floor_id, 1, 1e6)) {
     return res.status(400).json({ message: 'Invalid hostel or floor.' });
@@ -333,7 +334,7 @@ router.patch('/me/password', auth, loginLimiter, async (req, res) => {
     return res.status(400).json({ message: 'Enter your current password.' });
   }
   if (!v.isPassword(new_password)) {
-    return res.status(400).json({ message: `New password must be at least ${v.MIN_PASSWORD} characters.` });
+    return res.status(400).json({ message: `New password must be at least ${v.MIN_PASSWORD} characters and at most 72 UTF-8 bytes.` });
   }
   if (new_password === current_password) {
     return res.status(400).json({ message: 'New password must be different from the current one.' });
@@ -351,14 +352,17 @@ router.patch('/me/password', auth, loginLimiter, async (req, res) => {
       return res.status(401).json({ message: 'Current password is incorrect.' });
     }
     const password_hash = await bcrypt.hash(new_password, 10);
-    // password_changed_at signs out every other device (their tokens are older)
-    await db.query(
-      `UPDATE Student SET password_hash = ?, password_changed_at = now() - interval '1 second' WHERE student_id = ?`,
-      [password_hash, req.user.student_id]
+    // Increment an exact version: JWT timestamps have only second precision.
+    const [changed] = await db.query(
+      `UPDATE Student SET password_hash = ?, password_changed_at = now(), session_version = session_version + 1
+       WHERE student_id = ? AND password_hash = ? RETURNING session_version`,
+      [password_hash, req.user.student_id, rows[0].password_hash]
     );
+    if (!changed.length) return res.status(401).json({ message: 'Password changed. Please log in again.', code: 'INVALID_TOKEN' });
+    realtime.disconnectUser(req.user.student_id);
     const [fresh] = await db.query(`${STUDENT_SESSION_SQL} WHERE s.student_id = ?`, [req.user.student_id]);
     // a fresh token for this device, so the person changing it stays logged in
-    res.json({ message: 'Password changed. Other devices have been signed out.', ...sessionFor(fresh[0]) });
+    res.json({ message: 'Password changed. Other devices have been signed out.', ...sessionFor({ ...fresh[0], session_version: changed[0].session_version }) });
   } catch (err) {
     res.status(500).json({ message: 'Error changing password.', error: err.message });
   }

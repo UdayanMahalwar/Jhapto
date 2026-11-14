@@ -15,7 +15,7 @@ const AdminReportChat = ({ report, onClose, onSent }) => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', onKey);
     return () => { clearInterval(t); document.removeEventListener('keydown', onKey); };
-  }, [report.report_id]);
+  }, [report.report_id, onClose]);
 
   const send = async (text) => {
     const res = await api.post(`/admin/reports/${report.report_id}/messages`, { message_text: text });

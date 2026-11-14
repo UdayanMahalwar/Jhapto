@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Flag, MessageSquare } from 'lucide-react';
 import Header from '../components/Header';
@@ -50,14 +50,14 @@ const ReportDetail = ({ id }) => {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
 
-  const load = () => api.get(`/reports/${id}/messages`).then((r) => setData(r.data))
-    .catch((err) => setError(err.response?.data?.message || 'Could not load this report.'));
+  const load = useCallback(() => api.get(`/reports/${id}/messages`).then((r) => setData(r.data))
+    .catch((err) => setError(err.response?.data?.message || 'Could not load this report.')), [id]);
 
   useEffect(() => {
     load();
     const t = setInterval(load, POLL_MS);   // admin replies show up without a refresh
     return () => clearInterval(t);
-  }, [id]);
+  }, [load]);
 
   if (error) return <div className="alert alert-error" role="alert">{error}</div>;
   if (!data) return <p className="muted">Loading…</p>;

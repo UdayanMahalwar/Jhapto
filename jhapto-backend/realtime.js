@@ -40,9 +40,10 @@ async function authenticate(socket, next) {
   if (!decoded.student_id) return next(new Error('INVALID_TOKEN'));
   try {
     const [rows] = await db.query(
-      'SELECT is_banned, name, floor_id, hostel_id FROM Student WHERE student_id = ?', [decoded.student_id]
+      'SELECT is_banned, name, floor_id, hostel_id, session_version FROM Student WHERE student_id = ?', [decoded.student_id]
     );
     if (rows.length === 0) return next(new Error('INVALID_TOKEN'));
+    if ((decoded.session_version ?? 0) !== rows[0].session_version) return next(new Error('INVALID_TOKEN'));
     if (rows[0].is_banned) return next(new Error('ACCOUNT_BANNED'));
   } catch {
     return next(new Error('SERVER_ERROR'));

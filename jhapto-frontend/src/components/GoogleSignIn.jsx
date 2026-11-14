@@ -32,6 +32,8 @@ const GoogleSignIn = ({ onCredential, onError }) => {
   const [config, setConfig] = useState(null);
   const [busy, setBusy] = useState(false);
   const buttonRef = useRef(null);
+  const callbacks = useRef({ onCredential, onError });
+  useEffect(() => { callbacks.current = { onCredential, onError }; }, [onCredential, onError]);
   const { theme } = useTheme();
   const native = isNativeApp();
 
@@ -47,7 +49,7 @@ const GoogleSignIn = ({ onCredential, onError }) => {
       if (cancelled || !buttonRef.current) return;
       google.accounts.id.initialize({
         client_id: clientId,
-        callback: (r) => onCredential(r.credential),
+        callback: (r) => callbacks.current.onCredential(r.credential),
         hd: domain,                 // only offers Thapar accounts in the chooser (the server enforces it)
         ux_mode: 'popup',
         use_fedcm_for_button: true,
@@ -58,7 +60,7 @@ const GoogleSignIn = ({ onCredential, onError }) => {
         size: 'large', shape: 'pill', text: 'continue_with', logo_alignment: 'center',
         width: Math.min(400, buttonRef.current.offsetWidth || 320),
       });
-    }).catch((err) => onError?.(err.message));
+    }).catch((err) => { if (!cancelled) callbacks.current.onError?.(err.message); });
     return () => { cancelled = true; };
   }, [native, clientId, domain, theme]);
 
