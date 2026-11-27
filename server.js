@@ -1,34 +1,55 @@
-// server.js — the single entry point.
-// Serves the API (jhapto-backend/app.js), live chat (Socket.IO) and the
-// React frontend (Vite dev middleware, or the built files in production).
-
-import http from 'http';
-import path from 'path';
 import express from 'express';
+import cors from 'cors';
+import path from 'path';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
 import { createRequire } from 'module';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 
-const { createApp } = require('./jhapto-backend/app.js');
-const realtime = require('./jhapto-backend/realtime.js');
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'jhapto_super_secret_jwt_key_2026';
 
-const PORT = Number(process.env.PORT) || 3000;
-const HOST = process.env.HOST || '0.0.0.0';
+const app = express();
+const PORT = 3000;
 
-async function start() {
-  const app = createApp();
-  const server = http.createServer(app);
-  realtime.init(server);
+// ── Middleware ───────────────────────────────────────────────
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// ── API Routes ───────────────────────────────────────────────
+const authRoutes = require('./jhapto-backend/routes/auth.js');
+const listingsRoutes = require('./jhapto-backend/routes/listings.js');
+const ordersRoutes = require('./jhapto-backend/routes/orders.js');
+const messagesRoutes = require('./jhapto-backend/routes/messages.js');
+const adminRoutes = require('./jhapto-backend/routes/admin.js');
+const reportsRoutes = require('./jhapto-backend/routes/reports.js');
+
+app.use('/api/auth', authRoutes);
+app.use('/api/listings', listingsRoutes);
+app.use('/api/orders', ordersRoutes);
+app.use('/api/messages', messagesRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/reports', reportsRoutes);
+
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', message: 'Jhapto Server is running!' });
+});
+
+// ── Frontend / Vite Integration ──────────────────────────────
+async function setupViteOrStatic() {
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       root: path.resolve(__dirname, 'jhapto-frontend'),
       server: {
         middlewareMode: true,
-        hmr: { server },        // share this server for hot reload (Socket.IO uses /socket.io/)
+        host: '0.0.0.0',
+        port: PORT,
         allowedHosts: true,
       },
       appType: 'spa',
@@ -36,21 +57,17 @@ async function start() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.resolve(__dirname, 'jhapto-frontend/dist');
-    // Same page security headers Vercel adds (vercel.json)
-    const pageHeaders = require('./jhapto-backend/config/securityHeaders.json');
-    app.use((req, res, next) => { res.set(pageHeaders); next(); });
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       res.sendFile(path.resolve(distPath, 'index.html'));
     });
   }
 
-  server.listen(PORT, HOST, () => {
-    console.log(`🚀 Jhapto running on http://localhost:${PORT}`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Jhapto unified server running on http://0.0.0.0:${PORT}`);
   });
 }
 
-start().catch((err) => {
+setupViteOrStatic().catch(err => {
   console.error('Failed to start server:', err);
-  process.exit(1);
 });
