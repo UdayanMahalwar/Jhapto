@@ -50,7 +50,7 @@ describe('forged and stale logins', () => {
 
   test('new passwords need at least 8 characters', async () => {
     const res = await api().post('/api/auth/register').send({
-      name: 'Short Pw', email: 'shortpw@thapar.edu', phone_no: '9000000011', password: 'abc1234', hostel_id: 1, floor_id: 1,
+      name: 'Short Pw', email: 'shortpw@thapar.edu', phone_no: '9000000011', password: 'abc1234', hostel_id: 1, room_number: 'A-101',
     });
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/at least 8/);
@@ -150,7 +150,7 @@ test('password validation respects bcrypt UTF-8 byte limits', async () => {
   // 24 emoji fit the character limit but exceed bcrypt's 72-byte input limit.
   const res = await api().post('/api/auth/register').send({
     name: 'Unicode Password', email: 'unicodepw@thapar.edu', phone_no: '9000000022',
-    password: '🔒'.repeat(24), hostel_id: 1, floor_id: 1,
+    password: '🔒'.repeat(24), hostel_id: 1, room_number: 'A-101',
   });
   expect(res.status).toBe(400);
 });

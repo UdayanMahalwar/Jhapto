@@ -66,16 +66,16 @@ describe('Sign in with Google', () => {
 
     // the sign-up token can't be swapped for another identity, and bad input is checked
     const tampered = await api().post('/api/auth/google/complete')
-      .send({ signup_token: `${first.body.signup_token}x`, phone_no: '9000000001', hostel_id: 1, floor_id: 3 });
+      .send({ signup_token: `${first.body.signup_token}x`, phone_no: '9000000001', hostel_id: 1, room_number: 'A-110' });
     expect(tampered.status).toBe(401);
     const badFloor = await api().post('/api/auth/google/complete')
-      .send({ signup_token: first.body.signup_token, phone_no: '9000000001', hostel_id: 1, floor_id: 99 });
+      .send({ signup_token: first.body.signup_token, phone_no: '9000000001', hostel_id: 99, room_number: 'A-110' });
     expect(badFloor.status).toBe(400);
 
     const done = await api().post('/api/auth/google/complete')
-      .send({ signup_token: first.body.signup_token, phone_no: '9000000001', hostel_id: 1, floor_id: 3 }).expect(201);
+      .send({ signup_token: first.body.signup_token, phone_no: '9000000001', hostel_id: 1, room_number: 'a-110' }).expect(201);
     expect(done.body.token).toBeTruthy();
-    expect(done.body.student).toMatchObject({ email: thapar.email, floor_number: 3, hostel_name: 'Kailash Hostel' });
+    expect(done.body.student).toMatchObject({ email: thapar.email, hostel_name: 'Agira Hall', room_number: 'A-110' });
 
     const again = await api().post('/api/auth/google').send({ credential: 'token' }).expect(200);
     expect(again.body.student.email).toBe(thapar.email);
@@ -90,7 +90,7 @@ describe('Sign in with Google', () => {
 
   test('a password account with the same email is linked, not duplicated', async () => {
     await api().post('/api/auth/register').send({
-      name: 'Meera', email: 'meera@thapar.edu', phone_no: '9000000002', password: 'secret123', hostel_id: 1, floor_id: 2,
+      name: 'Meera', email: 'meera@thapar.edu', phone_no: '9000000002', password: 'secret123', hostel_id: 1, room_number: 'A-111',
     }).expect(201);
     googleSays({ sub: 'g-meera', email: 'meera@thapar.edu', hd: 'thapar.edu' });
     const res = await api().post('/api/auth/google').send({ credential: 'token' }).expect(200);
@@ -164,36 +164,34 @@ describe('report conversation between the reporter and admins', () => {
 
 // ── Hostels ──────────────────────────────────────────────────
 describe('admins add hostels', () => {
-  test('add a hostel with floors, add more floors; it shows up for sign-up', async () => {
+  test('the real Thapar hostels are there; admins can add one and students can join it', async () => {
+    const pub = await api().get('/api/auth/hostels').expect(200);   // no login needed
+    expect(pub.body).toHaveLength(18);
+    expect(pub.body.map((h) => h.hostel_code)).toEqual(expect.arrayContaining(['A', 'B', 'C', 'D', 'E', 'G', 'PG', 'PG-2', 'Q']));
+    expect(pub.body.find((h) => h.hostel_code === 'J')).toMatchObject({ hostel_name: 'Tejas Hall' });
+    expect(pub.body[0]).not.toHaveProperty('floors');
+
     const admin = await adminLogin();
     await api().post('/api/admin/hostels').set(bearer(admin))
-      .send({ hostel_name: 'Amritam Hostel', hostel_code: 'ah01', floor_count: 3 }).expect(201);
-    const dupe = await api().post('/api/admin/hostels').set(bearer(admin))
-      .send({ hostel_name: 'amritam hostel', hostel_code: 'AH02', floor_count: 3 });
+      .send({ hostel_name: 'New Hall', hostel_code: 'z1' }).expect(201);
+    const dupe = await api().post('/api/admin/hostels').set(bearer(admin)).send({ hostel_name: 'new hall', hostel_code: 'Z2' });
     expect(dupe.status).toBe(409);
     expect((await api().post('/api/admin/hostels').set(bearer(admin))
-      .send({ hostel_name: 'X', hostel_code: 'bad code!', floor_count: 3 })).status).toBe(400);
+      .send({ hostel_name: 'X', hostel_code: 'bad code!' })).status).toBe(400);
 
     const hostels = await api().get('/api/admin/hostels').set(bearer(admin)).expect(200);
-    const amritam = hostels.body.find((h) => h.hostel_name === 'Amritam Hostel');
-    expect(amritam).toMatchObject({ hostel_code: 'AH01', floors: [1, 2, 3], student_count: 0 });
+    expect(hostels.body.find((h) => h.hostel_name === 'New Hall')).toMatchObject({ hostel_code: 'Z1', student_count: 0 });
 
-    await api().post(`/api/admin/hostels/${amritam.hostel_id}/floors`).set(bearer(admin)).send({ floor_count: 2 }).expect(201);
-
-    const pub = await api().get('/api/auth/hostels').expect(200);   // no login needed
-    const listed = pub.body.find((h) => h.hostel_name === 'Amritam Hostel');
-    expect(listed.floors.map((f) => f.floor_number)).toEqual([1, 2, 3, 4, 5]);
-
-    // and students can register into it
+    const listed = (await api().get('/api/auth/hostels').expect(200)).body.find((h) => h.hostel_name === 'New Hall');
     await api().post('/api/auth/register').send({
       name: 'New Resident', email: 'resident@thapar.edu', phone_no: '9000000003', password: 'secret123',
-      hostel_id: listed.hostel_id, floor_id: listed.floors[4].floor_id,
+      hostel_id: listed.hostel_id, room_number: 'Z1-7',
     }).expect(201);
   });
 
   test('students cannot add hostels', async () => {
     const res = await api().post('/api/admin/hostels').set(bearer(await login('karan')))
-      .send({ hostel_name: 'Fake', hostel_code: 'FK01', floor_count: 2 });
+      .send({ hostel_name: 'Fake', hostel_code: 'FK01' });
     expect(res.status).toBe(403);
   });
 });

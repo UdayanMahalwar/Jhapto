@@ -4,7 +4,7 @@ beforeAll(resetDb);
 afterAll(() => db.end());
 
 describe('registration', () => {
-  const valid = { name: 'Test User', email: 'test@thapar.edu', phone_no: '9123456780', password: 'secret123', hostel_id: 1, floor_id: 2 };
+  const valid = { name: 'Test User', email: 'test@thapar.edu', phone_no: '9123456780', password: 'secret123', hostel_id: 1, room_number: 'a-301' };
 
   test.each([
     [{ email: 'not-an-email' }, /valid email/],
@@ -12,7 +12,9 @@ describe('registration', () => {
     [{ email: 'test@tiet.ac.in' }, /Thapar email/],
     [{ phone_no: '12345' }, /10-digit/],
     [{ password: "1234567" }, /at least 8/],
-    [{ floor_id: 99 }, /floor does not belong/],
+    [{ hostel_id: 99 }, /Choose your hostel/],
+    [{ room_number: '#12; DROP' }, /room number/],
+    [{ room_number: 'A'.repeat(21) }, /room number/],
   ])('rejects bad input %o', async (patch, msg) => {
     const res = await api().post('/api/auth/register').send({ ...valid, ...patch });
     expect(res.status).toBe(400);
@@ -21,6 +23,8 @@ describe('registration', () => {
 
   test('registers, then rejects the same email and phone', async () => {
     expect((await api().post('/api/auth/register').send(valid)).status).toBe(201);
+    expect((await sql('SELECT room_number, hostel_id FROM Student WHERE email = ?', [valid.email]))[0])
+      .toEqual({ room_number: 'A-301', hostel_id: 1 });
     const again = await api().post('/api/auth/register').send(valid);
     expect(again.status).toBe(409);
   });
@@ -39,7 +43,7 @@ describe('login', () => {
     const res = await api().post('/api/auth/login').send({ email: STUDENTS.priya.email, password: 'password123' });
     expect(res.status).toBe(200);
     expect(res.body.token).toEqual(expect.any(String));
-    expect(res.body.student).toMatchObject({ student_id: 2, floor_number: 1 });
+    expect(res.body.student).toMatchObject({ student_id: 2, hostel_name: 'Agira Hall', hostel_code: 'A', room_number: 'A-204' });
     expect(res.body.student.password_hash).toBeUndefined();
   });
 
@@ -75,7 +79,7 @@ describe('profile', () => {
 
   test('GET /me returns the profile without secrets', async () => {
     const res = await api().get('/api/auth/me').set(bearer(token)).expect(200);
-    expect(res.body).toMatchObject({ student_id: 5, email: STUDENTS.karan.email, floor_number: 4 });
+    expect(res.body).toMatchObject({ student_id: 5, email: STUDENTS.karan.email, hostel_name: 'Neeram Hall', room_number: 'D-210' });
     expect(res.body.password_hash).toBeUndefined();
   });
 
@@ -84,8 +88,8 @@ describe('profile', () => {
     expect(res.status).toBe(409);
   });
 
-  test('floor change applies immediately to listing priority, without re-login', async () => {
-    await api().patch('/api/auth/me').set(bearer(token)).send({ floor_id: STUDENTS.sneha.floor_id }).expect(200);
+  test('hostel change applies immediately to listing priority, without re-login', async () => {
+    await api().patch('/api/auth/me').set(bearer(token)).send({ hostel_id: STUDENTS.sneha.hostel_id }).expect(200);
     const listings = (await api().get('/api/listings').set(bearer(token)).expect(200)).body;
     const snehas = listings.find(l => l.seller_id === STUDENTS.sneha.id);
     expect(snehas.priority_rank).toBe(0);

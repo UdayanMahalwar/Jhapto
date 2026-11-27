@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import StarRating from '../components/StarRating';
 import AppDownload from '../components/AppDownload';
+import HostelRoomFields from '../components/HostelRoomFields';
 import { LogOut, Flag, ChevronRight } from 'lucide-react';
 import { enablePush, pushStatus } from '../utils/push';
 import { isNativeApp } from '../utils/native';
@@ -15,8 +16,8 @@ const ProfilePage = () => {
   const navigate = useNavigate();
 
   const [profile, setProfile] = useState(null);
-  const [floors, setFloors] = useState([]);
-  const [form, setForm] = useState({ name: '', phone_no: '', floor_id: '' });
+  const [hostels, setHostels] = useState([]);
+  const [form, setForm] = useState({ name: '', phone_no: '', hostel_id: '', room_number: '' });
   const [profileMsg, setProfileMsg] = useState({ text: '', type: '' });
 
   const [pw, setPw] = useState({ current_password: '', new_password: '', confirm: '' });
@@ -51,10 +52,10 @@ const ProfilePage = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const [me, fl] = await Promise.all([api.get('/auth/me'), api.get('/auth/floors')]);
+        const [me, hs] = await Promise.all([api.get('/auth/me'), api.get('/auth/hostels')]);
         setProfile(me.data);
-        setFloors(fl.data);
-        setForm({ name: me.data.name, phone_no: me.data.phone_no, floor_id: String(me.data.floor_id) });
+        setHostels(hs.data);
+        setForm({ name: me.data.name, phone_no: me.data.phone_no, hostel_id: me.data.hostel_id, room_number: me.data.room_number || '' });
         const rv = await api.get(`/reviews/seller/${me.data.student_id}`);
         setReviews(rv.data.reviews);
       } catch (err) {
@@ -70,7 +71,8 @@ const ProfilePage = () => {
     const changes = {};
     if (form.name.trim() !== profile.name) changes.name = form.name.trim();
     if (form.phone_no.trim() !== profile.phone_no) changes.phone_no = form.phone_no.trim();
-    if (Number(form.floor_id) !== Number(profile.floor_id)) changes.floor_id = Number(form.floor_id);
+    if (Number(form.hostel_id) !== Number(profile.hostel_id)) changes.hostel_id = Number(form.hostel_id);
+    if (form.room_number.trim().toUpperCase() !== (profile.room_number || '')) changes.room_number = form.room_number.trim();
     if (Object.keys(changes).length === 0) {
       return setProfileMsg({ text: 'Nothing changed.', type: 'success' });
     }
@@ -78,7 +80,7 @@ const ProfilePage = () => {
       const res = await api.patch('/auth/me', changes);
       const p = res.data.profile;
       setProfile(p);
-      updateUser({ name: p.name, floor_id: p.floor_id, floor_number: p.floor_number });
+      updateUser({ name: p.name, floor_id: p.floor_id, hostel_id: p.hostel_id, hostel_name: p.hostel_name, hostel_code: p.hostel_code, room_number: p.room_number });
       setProfileMsg({ text: 'Profile updated.', type: 'success' });
     } catch (err) {
       setProfileMsg({ text: err.response?.data?.message || 'Error updating profile', type: 'error' });
@@ -117,6 +119,12 @@ const ProfilePage = () => {
           </div>
         </div>
 
+        {profile && !profile.room_number && (
+          <div className="alert alert-error" role="alert" style={{ marginBottom: '1rem' }}>
+            Add your hostel and room number below — buyers collect your items from there, and you need it to sell.
+          </div>
+        )}
+
         {!profile ? (
           <p className="muted">Loading…</p>
         ) : (
@@ -139,12 +147,8 @@ const ProfilePage = () => {
                   <span>Phone number</span>
                   <input type="tel" required pattern="[6-9][0-9]{9}" title="10-digit mobile number" maxLength={10} value={form.phone_no} onChange={(e) => setForm({ ...form, phone_no: e.target.value })} className="input" />
                 </label>
-                <label className="field">
-                  <span>Floor ({profile.hostel_name})</span>
-                  <select value={form.floor_id} onChange={(e) => setForm({ ...form, floor_id: e.target.value })} className="input">
-                    {floors.map(f => <option key={f.floor_id} value={f.floor_id}>Floor {f.floor_number}</option>)}
-                  </select>
-                </label>
+                <HostelRoomFields labelled hostels={hostels} hostelId={form.hostel_id} room={form.room_number}
+                  onChange={(patch) => setForm((f) => ({ ...f, ...patch }))} />
                 <button type="submit" className="btn btn-primary">Save details</button>
               </form>
             </div>

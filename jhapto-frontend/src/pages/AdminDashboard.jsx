@@ -165,7 +165,7 @@ const AdminDashboard = () => {
                 <thead>
                   <tr>
                     <th>Student</th>
-                    <th>Floor</th>
+                    <th>Hostel &amp; room</th>
                     <th>Listings</th>
                     <th>Orders Bought</th>
                     <th>Earned</th>
@@ -179,7 +179,7 @@ const AdminDashboard = () => {
                         {r.student_name}
                         {Boolean(r.is_banned) && <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: 'var(--secondary-color)' }}>Banned</span>}
                       </td>
-                      <td>{r.floor_number}</td>
+                      <td>{r.hostel_name}{r.room_number ? ` · ${r.room_number}` : ''}</td>
                       <td>{r.total_listings}</td>
                       <td>{r.total_orders}</td>
                       <td style={{ padding: '1rem', color: 'var(--primary-color)', fontWeight: 'bold' }}>₹{r.total_revenue}</td>
@@ -235,6 +235,7 @@ const AdminDashboard = () => {
                     <th>Name</th>
                     <th>Email</th>
                     <th>Phone</th>
+                    <th>Hostel &amp; room</th>
                     <th>Status</th>
                     <th>Action</th>
                   </tr>
@@ -245,6 +246,7 @@ const AdminDashboard = () => {
                       <td>{s.name}</td>
                       <td>{s.email}</td>
                       <td>{s.phone_no}</td>
+                      <td>{s.hostel_name}{s.room_number ? ` · ${s.room_number}` : ' · no room yet'}</td>
                       <td><StatusBadge status={s.is_banned ? 'Banned' : 'Active'} /></td>
                       <td>
                         <button className={`btn btn-sm ${s.is_banned ? 'btn-secondary' : 'btn-danger'}`} onClick={() => handleToggleBan(s)}>

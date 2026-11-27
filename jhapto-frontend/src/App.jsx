@@ -8,6 +8,7 @@ import { ToastProvider } from './contexts/ToastContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import AppUpdatePrompt from './components/AppUpdatePrompt';
 import BottomNav from './components/BottomNav';
+import CompleteDetails from './components/CompleteDetails';
 import RouteBoundary from './components/RouteBoundary';
 import { enablePush } from './utils/push';
 import { isNativeApp } from './utils/native';
@@ -98,6 +99,7 @@ function AppRoutes() {
       </motion.div>
       </AnimatePresence>
       <BottomNav />
+      <CompleteDetails />
     </div>
   );
 }

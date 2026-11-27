@@ -129,7 +129,7 @@ const HomePage = () => {
                     <ProductCard
                       key={product.listing_id}
                       index={i}
-                      product={{ ...product, priority: product.priority_rank === 0 ? 'Same Floor' : 'Other Floor' }}
+                      product={{ ...product, sameHostel: product.priority_rank === 0 }}
                       onAdd={handleAddToCart}
                       onRemove={(p) => cart.remove(p.listing_id)}
                       cartQuantity={cart.quantityOf(product.listing_id)}

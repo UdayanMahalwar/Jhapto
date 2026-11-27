@@ -19,7 +19,9 @@ const Header = ({ user, onLogout, searchQuery, onSearchChange }) => {
   const cartCount = cart ? cart.count : 0;
   const [mobileSearch, setMobileSearch] = useState(false);
   const hasSearch = typeof onSearchChange === 'function';
-  const location = user ? `${user.hostel_name || `Hostel ${user.hostel_id}`}, Floor ${user.floor_number ?? user.floor_id}` : '';
+  const location = user
+    ? [user.hostel_name || `Hostel ${user.hostel_id}`, user.room_number && `Room ${user.room_number}`].filter(Boolean).join(' · ')
+    : '';
 
   return (
     <>

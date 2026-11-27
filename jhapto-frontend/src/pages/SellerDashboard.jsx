@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Check, MessageCircle, PackageCheck, Flag, Store, Inbox, Pencil, Trash2, RotateCcw } from 'lucide-react';
+import { MapPin, Check, MessageCircle, PackageCheck, Flag, Store, Inbox, Pencil, Trash2, RotateCcw } from 'lucide-react';
 import Header from '../components/Header';
 import { AuthContext } from '../contexts/auth';
 import { useToast } from '../contexts/toast';
@@ -36,7 +36,7 @@ const SellerDashboard = () => {
   const activeOrderTab = searchParams.get('tab') === 'history' ? 'history' : 'active';
   const [prefillItem] = useState(() => searchParams.get('new_item') || '');
   const [photoInputKey, setPhotoInputKey] = useState(0);   // bump to reset the file picker
-  const [newListing, setNewListing] = useState({ item_id: '', room_number: '', ...EMPTY_LISTING });
+  const [newListing, setNewListing] = useState({ item_id: '', ...EMPTY_LISTING });
   const [creating, setCreating] = useState(false);
   const [orderFilters, setOrderFilters] = useState(EMPTY_FILTERS);
   const [editListing, setEditListing] = useState(null); // form state for the listing being edited
@@ -117,7 +117,6 @@ const SellerDashboard = () => {
       selling_price: String(l.selling_price),
       quantity_available: String(l.quantity_available),
       description: l.description || '',
-      room_number: l.room_number || '',
       current_photo: l.photo_url || '',
       photo_url: undefined, // unchanged unless a new photo is picked
     });
@@ -150,7 +149,7 @@ const SellerDashboard = () => {
       const { new_item, item_id, ...rest } = newListing;
       const res = await api.post('/listings', new_item ? { ...rest, new_item } : { ...rest, item_id });
       toast(new_item ? `“${new_item.item_name.trim()}” added and listed!` : 'Listing is live!');
-      // keep the item and room — sellers usually list several things from the same room
+      // keep the item — sellers often list it again with a different price or photo
       setNewListing(prev => ({ ...prev, ...EMPTY_LISTING, item_id: res.data.item_id, new_item: undefined }));
       setPhotoInputKey(k => k + 1);
       fetchData();
@@ -230,17 +229,18 @@ const SellerDashboard = () => {
                     <span className="field-hint">{maxPrice(newListing.mrp)}</span>
                   </label>
                 </div>
-                <div className="field-row">
-                  <label className="field">
-                    <span>Quantity</span>
-                    <input className="input" type="number" min="1" max="1000" step="1" inputMode="numeric" required placeholder="1"
-                      value={newListing.quantity_available} onChange={(e) => set({ quantity_available: e.target.value })} />
-                  </label>
-                  <label className="field">
-                    <span>Room number</span>
-                    <input className="input" type="text" maxLength={50} required placeholder="K-204"
-                      value={newListing.room_number} onChange={(e) => set({ room_number: e.target.value })} />
-                  </label>
+                <label className="field">
+                  <span>Quantity</span>
+                  <input className="input" type="number" min="1" max="1000" step="1" inputMode="numeric" required placeholder="1"
+                    value={newListing.quantity_available} onChange={(e) => set({ quantity_available: e.target.value })} />
+                </label>
+                <div className="pickup-note">
+                  <MapPin size={15} aria-hidden="true" />
+                  {user?.room_number ? (
+                    <span>Buyers collect from <strong>{user.hostel_name} · Room {user.room_number}</strong>. <button type="button" className="link-btn" onClick={() => navigate('/profile')}>Change</button></span>
+                  ) : (
+                    <span>Add your room number in <button type="button" className="link-btn" onClick={() => navigate('/profile')}>your profile</button> before listing.</span>
+                  )}
                 </div>
                 <label className="field">
                   <span>Description (optional)</span>
@@ -376,17 +376,11 @@ const SellerDashboard = () => {
                 <span className="field-hint">{maxPrice(editListing.mrp)}</span>
               </label>
             </div>
-            <div className="field-row">
-              <label className="field">
-                <span>Quantity</span>
-                <input className="input" type="number" min="0" max="1000" step="1" required value={editListing.quantity_available} onChange={(e) => setEdit({ quantity_available: e.target.value })} />
-                <span className="field-hint">0 = out of stock</span>
-              </label>
-              <label className="field">
-                <span>Room number</span>
-                <input className="input" type="text" required maxLength={50} placeholder="K-204" value={editListing.room_number} onChange={(e) => setEdit({ room_number: e.target.value })} />
-              </label>
-            </div>
+            <label className="field">
+              <span>Quantity</span>
+              <input className="input" type="number" min="0" max="1000" step="1" required value={editListing.quantity_available} onChange={(e) => setEdit({ quantity_available: e.target.value })} />
+              <span className="field-hint">0 = out of stock</span>
+            </label>
             <label className="field">
               <span>Description</span>
               <input className="input" type="text" maxLength={500} value={editListing.description} onChange={(e) => setEdit({ description: e.target.value })} />

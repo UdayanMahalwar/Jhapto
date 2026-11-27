@@ -194,12 +194,14 @@ router.get('/my', auth, async (req, res) => {
       `SELECT o.order_id, i.item_name, oi.quantity, oi.price_at_purchase,
               o.total_amount, o.order_status, o.created_at,
               seller.name AS seller_name, seller.phone_no AS seller_phone, l.seller_id,
+              sh.hostel_name AS seller_hostel, l.room_number AS pickup_room,
               rv.rating AS my_rating, rv.comment AS my_review
        FROM "Order" o
        JOIN Order_Item oi ON o.order_id    = oi.order_id
        JOIN Listing    l  ON oi.listing_id = l.listing_id
        JOIN Item       i  ON l.item_id     = i.item_id
        JOIN Student    seller ON l.seller_id = seller.student_id
+       JOIN Hostel     sh ON sh.hostel_id = seller.hostel_id
        LEFT JOIN Review rv ON rv.order_id = o.order_id
        WHERE o.buyer_id = ?${filters.sql}
        ORDER BY o.created_at DESC, o.order_id DESC`,
@@ -222,12 +224,14 @@ router.get('/selling', auth, async (req, res) => {
       `SELECT o.order_id, i.item_name, oi.quantity, oi.price_at_purchase,
               o.total_amount, o.order_status, o.created_at,
               buyer.name AS buyer_name, buyer.phone_no AS buyer_phone, o.buyer_id,
+              bh.hostel_name AS buyer_hostel, buyer.room_number AS buyer_room,
               rv.rating AS buyer_rating, rv.comment AS buyer_review
        FROM "Order" o
        JOIN Order_Item oi ON o.order_id    = oi.order_id
        JOIN Listing    l  ON oi.listing_id = l.listing_id
        JOIN Item       i  ON l.item_id     = i.item_id
        JOIN Student    buyer ON o.buyer_id = buyer.student_id
+       JOIN Hostel     bh ON bh.hostel_id = buyer.hostel_id
        LEFT JOIN Review rv ON rv.order_id = o.order_id
        WHERE l.seller_id = ?${filters.sql}
        ORDER BY o.created_at DESC, o.order_id DESC`,

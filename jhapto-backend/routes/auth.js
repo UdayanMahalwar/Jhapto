@@ -31,49 +31,51 @@ function sessionFor(student) {
       name        : student.name,
       email       : student.email,
       floor_id    : student.floor_id,
-      floor_number: student.floor_number,
       hostel_id   : student.hostel_id,
       hostel_name : student.hostel_name,
+      hostel_code : student.hostel_code,
+      room_number : student.room_number,
     },
   };
 }
 
 const STUDENT_SESSION_SQL =
   `SELECT s.student_id, s.name, s.email, s.password_hash, s.google_sub, s.floor_id, s.hostel_id, s.is_banned, s.session_version,
-          f.floor_number, h.hostel_name
+          s.room_number, h.hostel_name, h.hostel_code
    FROM Student s
-   JOIN Floor  f ON s.floor_id  = f.floor_id
    JOIN Hostel h ON s.hostel_id = h.hostel_id`;
 
-// Shared checks for a new student's phone / hostel / floor (password and Google sign-up)
-async function checkNewStudent({ email, phone_no, hostel_id, floor_id }) {
-  const [floorRows] = await db.query(
-    'SELECT floor_id FROM Floor WHERE floor_id = ? AND hostel_id = ?', [floor_id, hostel_id]
+// Floors aren't shown in the app any more: every hostel has one internal floor,
+// which keeps the database's "same floor first" ranking working as "same hostel first".
+async function hostelFloor(hostel_id) {
+  const [rows] = await db.query(
+    'SELECT floor_id FROM Floor WHERE hostel_id = ? ORDER BY floor_number LIMIT 1', [hostel_id]
   );
-  if (floorRows.length === 0) return [400, 'That floor does not belong to the selected hostel.'];
+  return rows[0] ? rows[0].floor_id : null;
+}
+
+// Shared checks for a new student's phone / hostel (password and Google sign-up).
+// Returns [status, message] on a problem, else { floor_id } for the chosen hostel.
+async function checkNewStudent({ email, phone_no, hostel_id }) {
+  const floor_id = await hostelFloor(hostel_id);
+  if (!floor_id) return [400, 'Choose your hostel from the list.'];
   const [existingEmail] = await db.query('SELECT student_id FROM Student WHERE lower(email) = lower(?)', [email]);
   if (existingEmail.length > 0) return [409, 'Email already registered.'];
   const [existingPhone] = await db.query('SELECT student_id FROM Student WHERE phone_no = ?', [phone_no]);
   if (existingPhone.length > 0) return [409, 'Phone number already registered.'];
-  return null;
+  return { floor_id };
 }
 
 // ── GET /api/auth/hostels ────────────────────────────────────
-// Public: hostels and their floors for the sign-up form
+// Public: hostels for the sign-up form
 router.get('/hostels', async (req, res) => {
   try {
     const [rows] = await db.query(
-      `SELECT h.hostel_id, h.hostel_name, f.floor_id, f.floor_number
-       FROM Hostel h JOIN Floor f ON f.hostel_id = h.hostel_id
-       ORDER BY h.hostel_name, f.floor_number`
+      `SELECT hostel_id, hostel_name, hostel_code FROM Hostel
+       WHERE EXISTS (SELECT 1 FROM Floor f WHERE f.hostel_id = Hostel.hostel_id)
+       ORDER BY hostel_name`
     );
-    const hostels = [];
-    for (const r of rows) {
-      let h = hostels.find((x) => x.hostel_id === r.hostel_id);
-      if (!h) hostels.push(h = { hostel_id: r.hostel_id, hostel_name: r.hostel_name, floors: [] });
-      h.floors.push({ floor_id: r.floor_id, floor_number: r.floor_number });
-    }
-    res.json(hostels);
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ message: 'Error fetching hostels.', error: err.message });
   }
@@ -82,9 +84,9 @@ router.get('/hostels', async (req, res) => {
 // ── POST /api/auth/register ──────────────────────────────────
 // Registers a new student
 router.post('/register', registerLimiter, async (req, res) => {
-  let { name, email, phone_no, password, hostel_id, floor_id } = req.body;
+  let { name, email, phone_no, password, hostel_id, room_number } = req.body;
 
-  if (!name || !email || !phone_no || !password || !hostel_id || !floor_id) {
+  if (!name || !email || !phone_no || !password || !hostel_id || !room_number) {
     return res.status(400).json({ message: 'All fields are required.' });
   }
   if (!v.isNonEmptyString(name, 100)) {
@@ -102,24 +104,27 @@ router.post('/register', registerLimiter, async (req, res) => {
   if (!v.isPassword(password)) {
     return res.status(400).json({ message: `Password must be at least ${v.MIN_PASSWORD} characters and at most 72 UTF-8 bytes.` });
   }
-  if (!v.isIntInRange(hostel_id, 1, 1e6) || !v.isIntInRange(floor_id, 1, 1e6)) {
-    return res.status(400).json({ message: 'Invalid hostel or floor.' });
+  if (!v.isIntInRange(hostel_id, 1, 1e6)) {
+    return res.status(400).json({ message: 'Choose your hostel from the list.' });
+  }
+  if (!v.isRoom(room_number)) {
+    return res.status(400).json({ message: v.ROOM_MESSAGE });
   }
   name = name.trim();
   email = email.trim().toLowerCase();
   phone_no = phone_no.trim();
 
   try {
-    const problem = await checkNewStudent({ email, phone_no, hostel_id, floor_id });
-    if (problem) return res.status(problem[0]).json({ message: problem[1] });
+    const checked = await checkNewStudent({ email, phone_no, hostel_id });
+    if (Array.isArray(checked)) return res.status(checked[0]).json({ message: checked[1] });
 
     // Hash password before storing
     const password_hash = await bcrypt.hash(password, 10);
 
     await db.query(
-      `INSERT INTO Student (name, email, phone_no, password_hash, hostel_id, floor_id)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [name, email, phone_no, password_hash, hostel_id, floor_id]
+      `INSERT INTO Student (name, email, phone_no, password_hash, hostel_id, floor_id, room_number)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [name, email, phone_no, password_hash, hostel_id, checked.floor_id, room_number.trim().toUpperCase()]
     );
 
     res.status(201).json({ message: 'Registration successful! Please log in.' });
@@ -165,7 +170,7 @@ router.post('/login', loginLimiter, loginAccountLimiter, async (req, res) => {
 // ── POST /api/auth/google ────────────────────────────────────
 // Body: { credential } — the ID token from Google (website button or Android app).
 // Existing student → logged in. New Thapar student → { needs_profile, signup_token }
-// and the frontend asks for phone / hostel / floor, then calls /google/complete.
+// and the frontend asks for phone / hostel / room, then calls /google/complete.
 router.post('/google', loginLimiter, async (req, res) => {
   let google;
   try {
@@ -198,9 +203,9 @@ router.post('/google', loginLimiter, async (req, res) => {
 });
 
 // ── POST /api/auth/google/complete ───────────────────────────
-// Body: { signup_token, name?, phone_no, hostel_id, floor_id } — creates the account and logs in
+// Body: { signup_token, name?, phone_no, hostel_id, room_number } — creates the account and logs in
 router.post('/google/complete', registerLimiter, async (req, res) => {
-  const { signup_token, phone_no, hostel_id, floor_id } = req.body;
+  const { signup_token, phone_no, hostel_id, room_number } = req.body;
   let google;
   try {
     google = jwt.verify(signup_token, process.env.JWT_SECRET, { algorithms: ['HS256'] }).google_signup;
@@ -212,16 +217,19 @@ router.post('/google/complete', registerLimiter, async (req, res) => {
   const name = req.body.name !== undefined ? req.body.name : google.name;
   if (!v.isNonEmptyString(name, 100)) return res.status(400).json({ message: 'Name must be 1–100 characters.' });
   if (!v.isPhone(phone_no)) return res.status(400).json({ message: 'Enter a valid 10-digit mobile number.' });
-  if (!v.isIntInRange(hostel_id, 1, 1e6) || !v.isIntInRange(floor_id, 1, 1e6)) {
-    return res.status(400).json({ message: 'Invalid hostel or floor.' });
+  if (!v.isIntInRange(hostel_id, 1, 1e6)) {
+    return res.status(400).json({ message: 'Choose your hostel from the list.' });
+  }
+  if (!v.isRoom(room_number)) {
+    return res.status(400).json({ message: v.ROOM_MESSAGE });
   }
   try {
-    const problem = await checkNewStudent({ email: google.email, phone_no: phone_no.trim(), hostel_id, floor_id });
-    if (problem) return res.status(problem[0]).json({ message: problem[1] });
+    const checked = await checkNewStudent({ email: google.email, phone_no: phone_no.trim(), hostel_id });
+    if (Array.isArray(checked)) return res.status(checked[0]).json({ message: checked[1] });
     const [result] = await db.query(
-      `INSERT INTO Student (name, email, phone_no, password_hash, google_sub, hostel_id, floor_id)
-       VALUES (?, ?, ?, NULL, ?, ?, ?)`,
-      [name.trim(), google.email, phone_no.trim(), google.sub, hostel_id, floor_id]
+      `INSERT INTO Student (name, email, phone_no, password_hash, google_sub, hostel_id, floor_id, room_number)
+       VALUES (?, ?, ?, NULL, ?, ?, ?, ?)`,
+      [name.trim(), google.email, phone_no.trim(), google.sub, hostel_id, checked.floor_id, room_number.trim().toUpperCase()]
     );
     const [rows] = await db.query(`${STUDENT_SESSION_SQL} WHERE s.student_id = ?`, [result.insertId]);
     res.status(201).json({ message: 'Welcome to Jhapto!', ...sessionFor(rows[0]) });
@@ -233,12 +241,11 @@ router.post('/google/complete', registerLimiter, async (req, res) => {
 
 // ── Profile ──────────────────────────────────────────────────
 const PROFILE_SQL =
-  `SELECT s.student_id, s.name, s.email, s.phone_no, s.hostel_id, h.hostel_name,
-          s.floor_id, f.floor_number, s.avg_rating, s.rating_count, s.created_at,
+  `SELECT s.student_id, s.name, s.email, s.phone_no, s.hostel_id, h.hostel_name, h.hostel_code,
+          s.floor_id, s.room_number, s.avg_rating, s.rating_count, s.created_at,
           s.email_notifications, (s.password_hash IS NOT NULL) AS has_password, (s.google_sub IS NOT NULL) AS google_linked
    FROM Student s
    JOIN Hostel h ON s.hostel_id = h.hostel_id
-   JOIN Floor  f ON s.floor_id  = f.floor_id
    WHERE s.student_id = ?`;
 
 // GET /api/auth/me — current student's profile
@@ -252,28 +259,17 @@ router.get('/me', auth, async (req, res) => {
   }
 });
 
-// GET /api/auth/floors — floors of the student's hostel (for the profile floor picker)
-router.get('/floors', auth, async (req, res) => {
-  try {
-    const [rows] = await db.query(
-      'SELECT floor_id, floor_number FROM Floor WHERE hostel_id = ? ORDER BY floor_number',
-      [req.user.hostel_id]
-    );
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ message: 'Error fetching floors.', error: err.message });
-  }
-});
-
-// PATCH /api/auth/me — update name, phone number and/or floor
+// PATCH /api/auth/me — update name, phone number, hostel and/or room
+// (a new hostel / room is also copied to the student's current listings,
+//  since buyers collect from that room)
 router.patch('/me', auth, async (req, res) => {
   const student_id = req.user.student_id;
-  const { name, phone_no, floor_id, email_notifications } = req.body;
+  const { name, phone_no, hostel_id, room_number, email_notifications } = req.body;
 
   if (email_notifications !== undefined && typeof email_notifications !== 'boolean') {
     return res.status(400).json({ message: 'email_notifications must be true or false.' });
   }
-  if (name === undefined && phone_no === undefined && floor_id === undefined && email_notifications === undefined) {
+  if ([name, phone_no, hostel_id, room_number, email_notifications].every((x) => x === undefined)) {
     return res.status(400).json({ message: 'Nothing to update.' });
   }
   if (name !== undefined && !v.isNonEmptyString(name, 100)) {
@@ -282,8 +278,11 @@ router.patch('/me', auth, async (req, res) => {
   if (phone_no !== undefined && !v.isPhone(phone_no)) {
     return res.status(400).json({ message: 'Enter a valid 10-digit mobile number.' });
   }
-  if (floor_id !== undefined && !v.isIntInRange(floor_id, 1, 1e6)) {
-    return res.status(400).json({ message: 'Invalid floor.' });
+  if (hostel_id !== undefined && !v.isIntInRange(hostel_id, 1, 1e6)) {
+    return res.status(400).json({ message: 'Choose your hostel from the list.' });
+  }
+  if (room_number !== undefined && !v.isRoom(room_number)) {
+    return res.status(400).json({ message: v.ROOM_MESSAGE });
   }
 
   try {
@@ -296,29 +295,36 @@ router.patch('/me', auth, async (req, res) => {
         return res.status(409).json({ message: 'That phone number is already registered.' });
       }
     }
-    if (floor_id !== undefined) {
-      // Floor must be in the student's own hostel
-      const [floorRows] = await db.query(
-        'SELECT floor_id FROM Floor WHERE floor_id = ? AND hostel_id = ?', [floor_id, req.user.hostel_id]
-      );
-      if (floorRows.length === 0) {
-        return res.status(400).json({ message: 'That floor does not belong to your hostel.' });
-      }
+    let floor_id = null;
+    if (hostel_id !== undefined) {
+      floor_id = await hostelFloor(hostel_id);
+      if (!floor_id) return res.status(400).json({ message: 'Choose your hostel from the list.' });
     }
+    const room = room_number !== undefined ? room_number.trim().toUpperCase() : null;
 
     await db.query(
       `UPDATE Student
-       SET name     = COALESCE(?, name),
-           phone_no = COALESCE(?, phone_no),
-           floor_id = COALESCE(?, floor_id),
+       SET name        = COALESCE(?, name),
+           phone_no    = COALESCE(?, phone_no),
+           hostel_id   = COALESCE(?::int, hostel_id),
+           floor_id    = COALESCE(?::int, floor_id),
+           room_number = COALESCE(?, room_number),
            email_notifications = COALESCE(?::boolean, email_notifications)
        WHERE student_id = ?`,
       [name !== undefined ? name.trim() : null,
        phone_no !== undefined ? phone_no.trim() : null,
-       floor_id !== undefined ? Number(floor_id) : null,
+       hostel_id !== undefined ? Number(hostel_id) : null,
+       floor_id,
+       room,
        email_notifications !== undefined ? email_notifications : null,
        student_id]
     );
+    // Buyers pick up from the seller's room, so open listings follow a move
+    if (room) {
+      await db.query(
+        `UPDATE Listing SET room_number = ? WHERE seller_id = ? AND listing_status <> 'Removed'`, [room, student_id]
+      );
+    }
 
     const [rows] = await db.query(PROFILE_SQL, [student_id]);
     res.json({ message: 'Profile updated.', profile: rows[0] });

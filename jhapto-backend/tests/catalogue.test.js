@@ -29,7 +29,7 @@ test('listings come back with their category and no broken /photos paths', async
 
 test('login returns the hostel name for the header', async () => {
   const res = await api().post('/api/auth/login').send({ email: STUDENTS.aarav.email, password: 'password123' }).expect(200);
-  expect(res.body.student.hostel_name).toBe('Kailash Hostel');
+  expect(res.body.student).toMatchObject({ hostel_name: 'Agira Hall', hostel_code: 'A', room_number: 'A-101' });
 });
 
 describe('admin revenue report', () => {

@@ -12,6 +12,10 @@ const OrderCard = ({ order, role, children }) => {
   const otherPhone = isBuyer ? order.seller_phone : order.buyer_phone;
   const rating = isBuyer ? order.my_rating : order.buyer_rating;
   const review = isBuyer ? order.my_review : order.buyer_review;
+  // Where to meet: the seller's pickup room (buyer view) or the buyer's room (seller view)
+  const hostel = isBuyer ? order.seller_hostel : order.buyer_hostel;
+  const room = isBuyer ? order.pickup_room : order.buyer_room;
+  const place = [hostel, room && `Room ${room}`].filter(Boolean).join(' · ');
 
   return (
     <article className="card order-card" aria-label={`Order ${order.order_id}`}>
@@ -32,6 +36,12 @@ const OrderCard = ({ order, role, children }) => {
           <dt>Phone</dt>
           <dd>{otherPhone ? <a href={`tel:${otherPhone}`}>{otherPhone}</a> : '—'}</dd>
         </div>
+        {place && (
+          <div className="order-card-place">
+            <dt>{isBuyer ? 'Pick up from' : 'Buyer’s room'}</dt>
+            <dd>{place}</dd>
+          </div>
+        )}
         <div>
           <dt>Total</dt>
           <dd>₹{Number(order.total_amount).toFixed(2)}</dd>

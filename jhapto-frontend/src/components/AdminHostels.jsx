@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { useToast } from '../contexts/toast';
 import api from '../utils/api';
+import { hostelLabel } from '../utils/hostel';
 
-// Admin › Hostels: list hostels, add a hostel with its floors, add floors to one
+// Admin › Hostels: list hostels with their student counts, and add a new hostel
 const AdminHostels = () => {
   const [hostels, setHostels] = useState(null);
-  const [form, setForm] = useState({ hostel_name: '', hostel_code: '', floor_count: 4 });
+  const [form, setForm] = useState({ hostel_name: '', hostel_code: '' });
   const [msg, setMsg] = useState({ text: '', type: '' });
   const [saving, setSaving] = useState(false);
-  const toast = useToast();
 
   const load = () => api.get('/admin/hostels').then((r) => setHostels(r.data)).catch(() => setHostels([]));
   useEffect(() => { load(); }, []);
@@ -18,9 +17,9 @@ const AdminHostels = () => {
     setSaving(true);
     setMsg({ text: '', type: '' });
     try {
-      const res = await api.post('/admin/hostels', { ...form, floor_count: Number(form.floor_count) });
+      const res = await api.post('/admin/hostels', form);
       setMsg({ text: res.data.message, type: 'success' });
-      setForm({ hostel_name: '', hostel_code: '', floor_count: 4 });
+      setForm({ hostel_name: '', hostel_code: '' });
       load();
     } catch (err) {
       setMsg({ text: err.response?.data?.message || 'Could not add the hostel.', type: 'error' });
@@ -29,32 +28,18 @@ const AdminHostels = () => {
     }
   };
 
-  const addFloors = async (h) => {
-    const answer = window.prompt(`How many floors to add on top of ${h.hostel_name}'s floor ${h.floors.length ? Math.max(...h.floors) : 0}?`, '1');
-    if (answer === null) return;
-    try {
-      const res = await api.post(`/admin/hostels/${h.hostel_id}/floors`, { floor_count: Number(answer) });
-      toast(res.data.message);
-      load();
-    } catch (err) {
-      toast(err.response?.data?.message || 'Could not add floors.', 'error');
-    }
-  };
-
   return (
     <div>
       <h2 className="section-heading">Hostels</h2>
       {hostels === null ? <p className="muted">Loading…</p> : (
         <table className="table" style={{ marginBottom: '2rem' }}>
-          <thead><tr><th>Hostel</th><th>Code</th><th>Floors</th><th>Students</th><th /></tr></thead>
+          <thead><tr><th>Hostel</th><th>Code</th><th>Students</th></tr></thead>
           <tbody>
             {hostels.map((h) => (
               <tr key={h.hostel_id}>
-                <td>{h.hostel_name}</td>
+                <td>{hostelLabel(h)}</td>
                 <td>{h.hostel_code}</td>
-                <td>{h.floors.length ? `${h.floors.length} (${Math.min(...h.floors)}–${Math.max(...h.floors)})` : 'None'}</td>
                 <td>{h.student_count}</td>
-                <td><button className="btn btn-ghost btn-sm" onClick={() => addFloors(h)}>Add floors</button></td>
               </tr>
             ))}
           </tbody>
@@ -67,18 +52,13 @@ const AdminHostels = () => {
       )}
       <form onSubmit={addHostel} className="stack" style={{ maxWidth: 420, gap: '0.8rem' }}>
         <label className="field"><span>Hostel name</span>
-          <input className="input" type="text" required maxLength={100} placeholder="e.g. Amritam Hostel"
+          <input className="input" type="text" required maxLength={100} placeholder="e.g. Agira Hall"
             value={form.hostel_name} onChange={(e) => setForm({ ...form, hostel_name: e.target.value })} />
         </label>
         <label className="field"><span>Short code</span>
-          <input className="input" type="text" required maxLength={20} pattern="[A-Za-z0-9\-]+" placeholder="e.g. AH01"
+          <input className="input" type="text" required maxLength={20} pattern="[A-Za-z0-9][A-Za-z0-9/\-]*" placeholder="e.g. A"
             value={form.hostel_code} onChange={(e) => setForm({ ...form, hostel_code: e.target.value })} />
-          <span className="field-hint">Letters, numbers and dashes. Must be unique.</span>
-        </label>
-        <label className="field"><span>Number of floors</span>
-          <input className="input" type="number" required min={1} max={30}
-            value={form.floor_count} onChange={(e) => setForm({ ...form, floor_count: e.target.value })} />
-          <span className="field-hint">Floors are numbered 1, 2, 3 … Students pick one when they sign up.</span>
+          <span className="field-hint">The hostel letter, e.g. A, PG or PG-2. Must be unique.</span>
         </label>
         <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start' }} disabled={saving}>
           {saving ? 'Adding…' : 'Add hostel'}

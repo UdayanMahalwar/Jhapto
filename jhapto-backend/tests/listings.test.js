@@ -45,8 +45,9 @@ describe('editing listings', () => {
   test('updates fields; 0 stock → OutOfStock; restock → Active', async () => {
     const token = await login('sneha');
     await api().patch('/api/listings/4').set(bearer(token))
-      .send({ selling_price: '28.50', description: 'Chilled', room_number: 'K-315' }).expect(200);
-    expect(await listing(4)).toMatchObject({ selling_price: '28.50', description: 'Chilled', room_number: 'K-315', listing_status: 'Active' });
+      .send({ selling_price: '28.50', description: 'Chilled', room_number: 'Z-999' }).expect(200);
+    // the room can't be edited per listing: it stays the seller's profile room
+    expect(await listing(4)).toMatchObject({ selling_price: '28.50', description: 'Chilled', room_number: 'C-315', listing_status: 'Active' });
 
     const out = await api().patch('/api/listings/4').set(bearer(token)).send({ quantity_available: 0 }).expect(200);
     expect(out.body.listing_status).toBe('OutOfStock');
@@ -69,5 +70,34 @@ describe('editing listings', () => {
     const token = await login('priya');
     await api().delete('/api/listings/2').set(bearer(token)).expect(200);
     expect((await api().patch('/api/listings/2').set(bearer(token)).send({ quantity_available: 1 })).status).toBe(400);
+  });
+});
+
+describe('pickup room comes from the seller\'s profile', () => {
+  test('a new listing uses the profile room, whatever the request says', async () => {
+    const token = await login('karan');
+    await api().post('/api/listings').set(bearer(token))
+      .send({ item_id: 8, mrp: '100', selling_price: '90', quantity_available: '1', room_number: 'FAKE-1' }).expect(201);
+    const [row] = await sql('SELECT room_number FROM Listing WHERE seller_id = 5 AND item_id = 8');
+    expect(row.room_number).toBe('D-210');
+  });
+
+  test('without a room in the profile, selling is refused with a clear message', async () => {
+    await sql('UPDATE Student SET room_number = NULL WHERE student_id = 1');
+    const res = await api().post('/api/listings').set(bearer(await login('aarav')))
+      .send({ item_id: 9, mrp: '10', selling_price: '10', quantity_available: '1' });
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({ code: 'ROOM_REQUIRED' });
+    await sql("UPDATE Student SET room_number = 'A-101' WHERE student_id = 1");
+  });
+
+  test('moving room updates the seller\'s open listings, and buyers see the new pickup room', async () => {
+    const token = await login('karan');
+    const res = await api().patch('/api/auth/me').set(bearer(token)).send({ room_number: 'd-305' }).expect(200);
+    expect(res.body.profile.room_number).toBe('D-305');
+    const rooms = await sql(`SELECT DISTINCT room_number FROM Listing WHERE seller_id = 5 AND listing_status <> 'Removed'`);
+    expect(rooms.map((r) => r.room_number)).toEqual(['D-305']);
+    const browse = (await api().get('/api/listings').set(bearer(await login('rohan'))).expect(200)).body;
+    expect(browse.find((l) => l.seller_id === 5)).toMatchObject({ room_number: 'D-305', seller_hostel: 'Neeram Hall' });
   });
 });

@@ -7,31 +7,13 @@ import { readAuthMessage, clearAuthMessage } from '../utils/authMessage';
 import { AnimatePresence, motion } from 'framer-motion';
 import AuthShell from '../components/AuthShell';
 import GoogleSignIn from '../components/GoogleSignIn';
+import HostelRoomFields from '../components/HostelRoomFields';
 import './AuthPage.css';
-
-// Hostel + floor pickers, filled from the hostels admins have added
-const HostelFloorPicker = ({ hostels, hostelId, floorId, onChange }) => {
-  const hostel = hostels.find((h) => h.hostel_id === Number(hostelId)) || hostels[0];
-  return (
-    <div className="form-row">
-      <select aria-label="Hostel" required value={hostel?.hostel_id || ''}
-        onChange={(e) => {
-          const h = hostels.find((x) => x.hostel_id === Number(e.target.value));
-          onChange({ hostel_id: h.hostel_id, floor_id: h.floors[0]?.floor_id });
-        }}>
-        {hostels.map((h) => <option key={h.hostel_id} value={h.hostel_id}>{h.hostel_name}</option>)}
-      </select>
-      <select aria-label="Floor" required value={floorId || ''} onChange={(e) => onChange({ floor_id: Number(e.target.value) })}>
-        {(hostel?.floors || []).map((f) => <option key={f.floor_id} value={f.floor_id}>Floor {f.floor_number}</option>)}
-      </select>
-    </div>
-  );
-};
 
 const AuthPage = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
-    name: '', email: '', phone_no: '', password: '', hostel_id: '', floor_id: ''
+    name: '', email: '', phone_no: '', password: '', hostel_id: '', room_number: ''
   });
   const [hostels, setHostels] = useState([]);
   const [domains, setDomains] = useState(['thapar.edu']);
@@ -45,11 +27,7 @@ const AuthPage = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get('/auth/hostels').then((res) => {
-      setHostels(res.data);
-      const first = res.data[0];
-      if (first) setFormData((f) => ({ ...f, hostel_id: f.hostel_id || first.hostel_id, floor_id: f.floor_id || first.floors[0]?.floor_id }));
-    }).catch(() => {});
+    api.get('/auth/hostels').then((res) => setHostels(res.data)).catch(() => {});
     getConfig().then((c) => { if (c.allowedEmailDomains?.length) setDomains(c.allowedEmailDomains); });
   }, []);
 
@@ -65,7 +43,7 @@ const AuthPage = () => {
       if (googleSignup) {
         const res = await api.post('/auth/google/complete', {
           signup_token: googleSignup.signup_token, name: formData.name,
-          phone_no: formData.phone_no, hostel_id: formData.hostel_id, floor_id: formData.floor_id,
+          phone_no: formData.phone_no, hostel_id: formData.hostel_id, room_number: formData.room_number,
         });
         startSession(res.data);
         navigate('/');
@@ -124,7 +102,7 @@ const AuthPage = () => {
             <div className="auth-google-account">Signed in as <strong>{googleSignup.email}</strong></div>
             <input type="text" name="name" placeholder="Full Name" required maxLength={100} value={formData.name} onChange={handleChange} />
             <input type="tel" name="phone_no" placeholder="Phone Number (10 digits)" required pattern="[6-9][0-9]{9}" title="10-digit mobile number" maxLength={10} value={formData.phone_no} onChange={handleChange} />
-            <HostelFloorPicker hostels={hostels} hostelId={formData.hostel_id} floorId={formData.floor_id}
+            <HostelRoomFields hostels={hostels} hostelId={formData.hostel_id} room={formData.room_number}
               onChange={(patch) => setFormData((f) => ({ ...f, ...patch }))} />
             <motion.button type="submit" className="auth-btn" whileTap={{ scale: 0.97 }} disabled={busy}>
               {busy ? 'Creating account…' : 'Finish sign-up'}
@@ -143,7 +121,7 @@ const AuthPage = () => {
                   transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}>
                   <input type="text" name="name" placeholder="Full Name" required maxLength={100} onChange={handleChange} />
                   <input type="tel" name="phone_no" placeholder="Phone Number (10 digits)" required pattern="[6-9][0-9]{9}" title="10-digit mobile number" maxLength={10} onChange={handleChange} />
-                  <HostelFloorPicker hostels={hostels} hostelId={formData.hostel_id} floorId={formData.floor_id}
+                  <HostelRoomFields hostels={hostels} hostelId={formData.hostel_id} room={formData.room_number}
                     onChange={(patch) => setFormData((f) => ({ ...f, ...patch }))} />
                 </motion.div>
               )}

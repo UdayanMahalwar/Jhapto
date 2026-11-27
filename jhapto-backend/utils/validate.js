@@ -45,10 +45,14 @@ const intParam = (req, res, next, value) => {
   next();
 };
 
+// Hostel room, e.g. "A-204", "B 112", "FRF/G-12": 1–20 letters, digits, spaces, - or /
+const isRoom = (v) => typeof v === 'string' && /^[A-Za-z0-9][A-Za-z0-9 \-\/]{0,19}$/.test(v.trim());
+const ROOM_MESSAGE = 'Enter your room number (e.g. A-204): up to 20 letters, numbers, spaces, - or /.';
+
 const MIN_PASSWORD = 8;
 const isPassword = (v) => typeof v === 'string' && v.length >= MIN_PASSWORD && Buffer.byteLength(v, 'utf8') <= 72;
 
 module.exports = {
   isNonEmptyString, isEmail, isPhone, isIntInRange, isPrice, isOptionalImage, isPassword,
-  MIN_PASSWORD, MAX_IMAGE_BYTES, intParam,
+  MIN_PASSWORD, MAX_IMAGE_BYTES, intParam, isRoom, ROOM_MESSAGE,
 };

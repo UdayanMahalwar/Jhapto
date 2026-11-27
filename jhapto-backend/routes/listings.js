@@ -16,7 +16,13 @@ router.get('/', auth, async (req, res) => {
   const buyer_floor_id = req.user.floor_id;
   try {
     const [rows] = await db.query(
-      'SELECT * FROM sp_floor_priority_listings(?)', [buyer_floor_id]
+      // The procedure ranks the buyer's own hostel first (one internal floor per hostel);
+      // the seller's hostel is added for display, keeping the procedure's order.
+      `SELECT p.*, h.hostel_name AS seller_hostel, h.hostel_code AS seller_hostel_code
+       FROM sp_floor_priority_listings(?) p
+       JOIN Student s ON s.student_id = p.seller_id
+       JOIN Hostel  h ON h.hostel_id  = s.hostel_id
+       ORDER BY p.priority_rank, p.listing_id DESC`, [buyer_floor_id]
     );
     res.json(rows);
   } catch (err) {
@@ -88,13 +94,14 @@ async function findOrCreateItem(newItem, student_id) {
 // Creates a new listing (price validation handled by DB trigger)
 router.post('/', auth, async (req, res) => {
   let { item_id } = req.body;
-  const { new_item, mrp, selling_price, quantity_available, description, photo_url, room_number } = req.body;
+  // No room in the body: buyers collect from the room in the seller's profile
+  const { new_item, mrp, selling_price, quantity_available, description, photo_url } = req.body;
   const seller_id = req.user.student_id;
 
   // A seller can pick a catalogue item (item_id) or describe a new one (new_item)
   if (!item_id && new_item) {
-    if (!mrp || !selling_price || !quantity_available || !room_number) {
-      return res.status(400).json({ message: 'mrp, selling_price, quantity, and room_number are required.' });
+    if (!mrp || !selling_price || !quantity_available) {
+      return res.status(400).json({ message: 'mrp, selling_price and quantity are required.' });
     }
     try {
       const found = await findOrCreateItem(new_item, seller_id);
@@ -105,8 +112,8 @@ router.post('/', auth, async (req, res) => {
     }
   }
 
-  if (!item_id || !mrp || !selling_price || !quantity_available || !room_number) {
-    return res.status(400).json({ message: 'item_id, mrp, selling_price, quantity, and room_number are required.' });
+  if (!item_id || !mrp || !selling_price || !quantity_available) {
+    return res.status(400).json({ message: 'item_id, mrp, selling_price and quantity are required.' });
   }
   if (!v.isIntInRange(item_id, 1, 2147483647)) {
     return res.status(400).json({ message: 'Choose an item from the list.' });
@@ -117,9 +124,6 @@ router.post('/', auth, async (req, res) => {
   if (!v.isIntInRange(quantity_available, 1, 1000)) {
     return res.status(400).json({ message: 'Quantity must be a whole number between 1 and 1000.' });
   }
-  if (!v.isNonEmptyString(room_number, 50)) {
-    return res.status(400).json({ message: 'Room number must be 1–50 characters.' });
-  }
   if (description != null && description !== '' && !v.isNonEmptyString(description, 500)) {
     return res.status(400).json({ message: 'Description can be at most 500 characters.' });
   }
@@ -128,6 +132,12 @@ router.post('/', auth, async (req, res) => {
   }
 
   try {
+    const [[me]] = await db.query('SELECT room_number FROM Student WHERE student_id = ?', [seller_id]);
+    const room_number = me && me.room_number;
+    if (!room_number) {
+      return res.status(400).json({ message: 'Add your room number in your profile first — buyers collect from there.', code: 'ROOM_REQUIRED' });
+    }
+
     // fn_is_price_valid checks price <= 1.5x MRP
     const [check] = await db.query(
       'SELECT fn_is_price_valid(?, ?) AS valid', [mrp, selling_price]
@@ -140,7 +150,7 @@ router.post('/', auth, async (req, res) => {
       `INSERT INTO Listing (seller_id, item_id, mrp, selling_price, quantity_available, description, photo_url, room_number)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [seller_id, item_id, mrp, selling_price, quantity_available,
-       description ? description.trim() : null, photo_url || null, room_number.trim()]
+       description ? description.trim() : null, photo_url || null, room_number]
     );
 
     res.status(201).json({ message: 'Listing created successfully!', item_id: Number(item_id) });
@@ -158,18 +168,19 @@ router.post('/', auth, async (req, res) => {
 
 // ── PATCH /api/listings/:id ──────────────────────────────────
 // Seller edits their own listing. Any subset of:
-//   mrp, selling_price, quantity_available, description, room_number, photo_url
+//   mrp, selling_price, quantity_available, description, photo_url
+// (the pickup room comes from the seller's profile and changes with it)
 // Price rule (<= 1.5x MRP) is also enforced by trg_check_price_update.
 // Restocking an OutOfStock listing (quantity > 0) makes it Active again;
 // setting quantity to 0 marks it OutOfStock (trg_auto_out_of_stock).
 router.patch('/:id', auth, async (req, res) => {
   const seller_id = req.user.student_id;
-  const { mrp, selling_price, quantity_available, description, room_number, photo_url } = req.body;
+  const { mrp, selling_price, quantity_available, description, photo_url } = req.body;
 
   if (!v.isIntInRange(req.params.id, 1, 2147483647)) {
     return res.status(400).json({ message: 'Invalid listing.' });
   }
-  const provided = { mrp, selling_price, quantity_available, description, room_number, photo_url };
+  const provided = { mrp, selling_price, quantity_available, description, photo_url };
   if (Object.values(provided).every(x => x === undefined)) {
     return res.status(400).json({ message: 'Nothing to update.' });
   }
@@ -181,9 +192,6 @@ router.patch('/:id', auth, async (req, res) => {
   }
   if (quantity_available !== undefined && !v.isIntInRange(quantity_available, 0, 1000)) {
     return res.status(400).json({ message: 'Quantity must be a whole number between 0 and 1000.' });
-  }
-  if (room_number !== undefined && !v.isNonEmptyString(room_number, 50)) {
-    return res.status(400).json({ message: 'Room number must be 1–50 characters.' });
   }
   if (description !== undefined && description !== null && description !== '' && !v.isNonEmptyString(description, 500)) {
     return res.status(400).json({ message: 'Description can be at most 500 characters.' });
@@ -239,14 +247,12 @@ router.patch('/:id', auth, async (req, res) => {
            selling_price      = ?,
            quantity_available = COALESCE(?, quantity_available),
            description        = CASE WHEN ?::boolean THEN ? ELSE description END,
-           room_number        = COALESCE(?, room_number),
            photo_url          = CASE WHEN ?::boolean THEN ? ELSE photo_url END,
            listing_status     = ?
        WHERE listing_id = ?`,
       [newMrp, newPrice,
        quantity_available !== undefined ? Number(quantity_available) : null,
        description !== undefined, description ? description.trim() : null,
-       room_number !== undefined ? room_number.trim() : null,
        photo_url !== undefined, photo_url || null,
        newStatus,
        listing.listing_id]

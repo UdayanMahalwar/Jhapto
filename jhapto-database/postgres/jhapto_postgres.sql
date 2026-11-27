@@ -41,7 +41,8 @@ CREATE TABLE student (
     password_hash VARCHAR(255),                       -- NULL for Google-only accounts
     google_sub    VARCHAR(64) UNIQUE,                 -- Google account id (sign in with Google)
     hostel_id     INT NOT NULL REFERENCES hostel(hostel_id),
-    floor_id      INT NOT NULL REFERENCES floor(floor_id),
+    floor_id      INT NOT NULL REFERENCES floor(floor_id),   -- internal: one floor per hostel
+    room_number   VARCHAR(20),                       -- e.g. A-204; listings use it as the pickup room
     is_banned     BOOLEAN NOT NULL DEFAULT FALSE,
     email_notifications BOOLEAN NOT NULL DEFAULT TRUE,
     session_version INT NOT NULL DEFAULT 0,          -- incremented to revoke sessions without timestamp races
@@ -611,18 +612,44 @@ JOIN item    i ON l.item_id   = i.item_id;
 --  Demo logins: students password123, admin@jhapto.com admin123
 -- ============================================================
 
-INSERT INTO hostel (hostel_name, hostel_code) VALUES ('Kailash Hostel', 'KH01');
-INSERT INTO floor (floor_number, hostel_id) VALUES (1,1),(2,1),(3,1),(4,1),(5,1),(6,1);
+-- Thapar Institute (TIET), Patiala halls of residence, from thapar.edu
+-- (students/pages/boys-hostel and girls-hostel). The app doesn't use floors:
+-- each hostel has one internal floor, so "same floor" ranking = "same hostel".
+INSERT INTO hostel (hostel_name, hostel_code) VALUES
+    ('Agira Hall', 'A'),
+    ('Amritam Hall', 'B'),
+    ('Prithvi Hall', 'C'),
+    ('Neeram Hall', 'D'),
+    ('Vyan Hall', 'H'),
+    ('Tejas Hall', 'J'),
+    ('Ambaram Hall', 'K'),
+    ('Viyat Hall', 'L'),
+    ('Anantam Hall', 'M'),
+    ('Vyom Hall', 'O'),
+    ('Vasudha Hall (Block E)', 'E'),
+    ('Vasudha Hall (Block G)', 'G'),
+    ('Ira Hall', 'I'),
+    ('Ananta Hall', 'N'),
+    ('Dhriti Hall', 'PG'),
+    ('Vahni Hall', 'Q'),
+    ('Pavani Hall', 'PG-2'),
+    ('Hostel FRF/G', 'FRF/G')
+ON CONFLICT (hostel_code) DO NOTHING;
+INSERT INTO floor (floor_number, hostel_id)
+SELECT 0, h.hostel_id FROM hostel h
+WHERE NOT EXISTS (SELECT 1 FROM floor f WHERE f.hostel_id = h.hostel_id)
+ORDER BY h.hostel_id;
 
 INSERT INTO admin (name, email, password_hash)
 VALUES ('Admin Jhapto', 'admin@jhapto.com', '$2a$10$qbhq.15XRbBYGk7EXf1CzOZ/Z8TXJpsDSRwDywflGXZdwbapzs10e');
 
-INSERT INTO student (name, email, phone_no, password_hash, hostel_id, floor_id) VALUES
-('Aarav Sharma', 'aarav@tiet.ac.in', '9876543210', '$2a$10$Er7RAvUKbORp/Fp411lXLO1zYNhMGFdUopOahefH1eLHJUx.JKyR2', 1, 1),
-('Priya Mehta',  'priya@tiet.ac.in', '9876543211', '$2a$10$Er7RAvUKbORp/Fp411lXLO1zYNhMGFdUopOahefH1eLHJUx.JKyR2', 1, 1),
-('Rohan Verma',  'rohan@tiet.ac.in', '9876543212', '$2a$10$Er7RAvUKbORp/Fp411lXLO1zYNhMGFdUopOahefH1eLHJUx.JKyR2', 1, 2),
-('Sneha Gupta',  'sneha@tiet.ac.in', '9876543213', '$2a$10$Er7RAvUKbORp/Fp411lXLO1zYNhMGFdUopOahefH1eLHJUx.JKyR2', 1, 3),
-('Karan Singh',  'karan@tiet.ac.in', '9876543214', '$2a$10$Er7RAvUKbORp/Fp411lXLO1zYNhMGFdUopOahefH1eLHJUx.JKyR2', 1, 4);
+-- Demo students (local development / tests only): Agira (A), Amritam (B), Prithvi (C), Neeram (D)
+INSERT INTO student (name, email, phone_no, password_hash, hostel_id, floor_id, room_number) VALUES
+('Aarav Sharma', 'aarav@tiet.ac.in', '9876543210', '$2a$10$Er7RAvUKbORp/Fp411lXLO1zYNhMGFdUopOahefH1eLHJUx.JKyR2', 1, 1, 'A-101'),
+('Priya Mehta',  'priya@tiet.ac.in', '9876543211', '$2a$10$Er7RAvUKbORp/Fp411lXLO1zYNhMGFdUopOahefH1eLHJUx.JKyR2', 1, 1, 'A-204'),
+('Rohan Verma',  'rohan@tiet.ac.in', '9876543212', '$2a$10$Er7RAvUKbORp/Fp411lXLO1zYNhMGFdUopOahefH1eLHJUx.JKyR2', 2, 2, 'B-112'),
+('Sneha Gupta',  'sneha@tiet.ac.in', '9876543213', '$2a$10$Er7RAvUKbORp/Fp411lXLO1zYNhMGFdUopOahefH1eLHJUx.JKyR2', 3, 3, 'C-315'),
+('Karan Singh',  'karan@tiet.ac.in', '9876543214', '$2a$10$Er7RAvUKbORp/Fp411lXLO1zYNhMGFdUopOahefH1eLHJUx.JKyR2', 4, 4, 'D-210');
 
 INSERT INTO category (category_name) VALUES
 ('Snacks & Food'), ('Noodles & Instant Food'), ('Beverages'), ('Chocolates & Sweets'),
@@ -680,12 +707,12 @@ FROM (VALUES
 ) AS t(item_name, brand, category_name)
 JOIN category c ON c.category_name = t.category_name;
 
-INSERT INTO listing (seller_id, item_id, mrp, selling_price, quantity_available, description) VALUES
-(1, 1, 20.00, 22.00, 5,  'Fresh pack, bought yesterday'),
-(2, 2, 14.00, 15.00, 3,  'Masala flavor available'),
-(3, 3, 50.00, 55.00, 2,  'Sealed pack'),
-(4, 4, 30.00, 30.00, 10, 'Cold, just from canteen'),
-(5, 5, 20.00, 20.00, 7,  'Full party pack');
+INSERT INTO listing (seller_id, item_id, mrp, selling_price, quantity_available, description, room_number) VALUES
+(1, 1, 20.00, 22.00, 5,  'Fresh pack, bought yesterday', 'A-101'),
+(2, 2, 14.00, 15.00, 3,  'Masala flavor available',      'A-204'),
+(3, 3, 50.00, 55.00, 2,  'Sealed pack',                  'B-112'),
+(4, 4, 30.00, 30.00, 10, 'Cold, just from canteen',      'C-315'),
+(5, 5, 20.00, 20.00, 7,  'Full party pack',              'D-210');
 
 INSERT INTO "Order" (buyer_id, order_status, total_amount) VALUES
 (3, 'Delivered', 22.00),

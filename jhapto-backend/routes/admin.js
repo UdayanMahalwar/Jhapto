@@ -178,7 +178,15 @@ router.patch('/students/:id/unban', adminAuth, async (req, res) => {
 // Full admin report using stored procedure with cursor
 router.get('/report', adminAuth, async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT * FROM sp_admin_report()');
+    // Same cursor-based report; hostel and room added for display (floors aren't used any more)
+    const [rows] = await db.query(
+      `SELECT r.student_id, r.student_name, r.is_banned, r.total_listings, r.total_orders,
+              r.total_revenue, r.pending_revenue, h.hostel_name, s.room_number
+       FROM sp_admin_report() WITH ORDINALITY AS r
+       JOIN Student s ON s.student_id = r.student_id
+       JOIN Hostel  h ON h.hostel_id  = s.hostel_id
+       ORDER BY r.ordinality`
+    );
     res.json(rows);
   } catch (err) {
     res.status(500).json({ message: 'Error generating report.', error: err.message });
@@ -191,8 +199,8 @@ router.get('/students', adminAuth, async (req, res) => {
   try {
     const [rows] = await db.query(
       `SELECT s.student_id, s.name, s.email, s.phone_no,
-              f.floor_number, s.is_banned, s.created_at
-       FROM Student s JOIN Floor f ON s.floor_id = f.floor_id
+              h.hostel_name, h.hostel_code, s.room_number, s.is_banned, s.created_at
+       FROM Student s JOIN Hostel h ON s.hostel_id = h.hostel_id
        ORDER BY s.created_at DESC`
     );
     res.json(rows);
@@ -318,13 +326,12 @@ router.post('/reports/:id/messages', adminAuth, async (req, res) => {
 });
 
 // ── Hostels ──────────────────────────────────────────────────
-// GET /api/admin/hostels — every hostel with its floors and student count
+// GET /api/admin/hostels — every hostel with its student count
 router.get('/hostels', adminAuth, async (req, res) => {
   try {
     const [rows] = await db.query(
       `SELECT h.hostel_id, h.hostel_name, h.hostel_code,
-              (SELECT COUNT(*) FROM Student s WHERE s.hostel_id = h.hostel_id) AS student_count,
-              COALESCE((SELECT json_agg(f.floor_number ORDER BY f.floor_number) FROM Floor f WHERE f.hostel_id = h.hostel_id), '[]') AS floors
+              (SELECT COUNT(*) FROM Student s WHERE s.hostel_id = h.hostel_id) AS student_count
        FROM Hostel h ORDER BY h.hostel_name`
     );
     res.json(rows);
@@ -333,14 +340,14 @@ router.get('/hostels', adminAuth, async (req, res) => {
   }
 });
 
-// POST /api/admin/hostels  { hostel_name, hostel_code, floor_count } — floors are numbered 1..floor_count
+// POST /api/admin/hostels  { hostel_name, hostel_code }
+// (floors aren't used by the app; the hostel gets one internal floor for the ranking procedure)
 router.post('/hostels', adminAuth, async (req, res) => {
-  let { hostel_name, hostel_code, floor_count } = req.body;
+  let { hostel_name, hostel_code } = req.body;
   if (!v.isNonEmptyString(hostel_name, 100)) return res.status(400).json({ message: 'Hostel name must be 1–100 characters.' });
-  if (typeof hostel_code !== 'string' || !/^[A-Za-z0-9-]{1,20}$/.test(hostel_code.trim())) {
-    return res.status(400).json({ message: 'Hostel code must be 1–20 letters, numbers or dashes (e.g. KH02).' });
+  if (typeof hostel_code !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9/-]{0,19}$/.test(hostel_code.trim())) {
+    return res.status(400).json({ message: 'Hostel code must be 1–20 letters, numbers, dashes or slashes (e.g. A, PG-2).' });
   }
-  if (!v.isIntInRange(floor_count, 1, 30)) return res.status(400).json({ message: 'Number of floors must be between 1 and 30.' });
   hostel_name = hostel_name.trim();
   hostel_code = hostel_code.trim().toUpperCase();
 
@@ -355,43 +362,15 @@ router.post('/hostels', adminAuth, async (req, res) => {
       return res.status(409).json({ message: 'A hostel with that name or code already exists.' });
     }
     const [created] = await conn.query('INSERT INTO Hostel (hostel_name, hostel_code) VALUES (?, ?)', [hostel_name, hostel_code]);
-    const floors = Array.from({ length: Number(floor_count) }, (_, i) => i + 1);
-    await conn.query(
-      `INSERT INTO Floor (floor_number, hostel_id) VALUES ${floors.map(() => '(?, ?)').join(', ')}`,
-      floors.flatMap((n) => [n, created.insertId])
-    );
+    await conn.query('INSERT INTO Floor (floor_number, hostel_id) VALUES (0, ?)', [created.insertId]);
     await conn.commit();
-    res.status(201).json({ message: `${hostel_name} added with ${floors.length} floors.`, hostel_id: created.insertId });
+    res.status(201).json({ message: `${hostel_name} added. Students can choose it when they sign up.`, hostel_id: created.insertId });
   } catch (err) {
     await conn.rollback();
     if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'A hostel with that code already exists.' });
     res.status(500).json({ message: 'Error adding hostel.', error: err.message });
   } finally {
     conn.release();
-  }
-});
-
-// POST /api/admin/hostels/:id/floors  { floor_count } — adds floors on top of the existing ones
-router.post('/hostels/:id/floors', adminAuth, async (req, res) => {
-  const { floor_count } = req.body;
-  if (!v.isIntInRange(req.params.id, 1, 2147483647)) return res.status(400).json({ message: 'Invalid hostel.' });
-  if (!v.isIntInRange(floor_count, 1, 30)) return res.status(400).json({ message: 'Add between 1 and 30 floors.' });
-  try {
-    const [rows] = await db.query(
-      'SELECT h.hostel_id, COALESCE(MAX(f.floor_number), 0) AS top FROM Hostel h LEFT JOIN Floor f ON f.hostel_id = h.hostel_id WHERE h.hostel_id = ? GROUP BY h.hostel_id',
-      [req.params.id]
-    );
-    if (rows.length === 0) return res.status(404).json({ message: 'Hostel not found.' });
-    const top = Number(rows[0].top);
-    if (top + Number(floor_count) > 50) return res.status(400).json({ message: 'A hostel can have at most 50 floors.' });
-    const floors = Array.from({ length: Number(floor_count) }, (_, i) => top + i + 1);
-    await db.query(
-      `INSERT INTO Floor (floor_number, hostel_id) VALUES ${floors.map(() => '(?, ?)').join(', ')}`,
-      floors.flatMap((n) => [n, rows[0].hostel_id])
-    );
-    res.status(201).json({ message: `Added floors ${floors[0]}–${floors[floors.length - 1]}.` });
-  } catch (err) {
-    res.status(500).json({ message: 'Error adding floors.', error: err.message });
   }
 });
 

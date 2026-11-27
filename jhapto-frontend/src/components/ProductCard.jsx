@@ -9,7 +9,7 @@ const spring = { type: 'spring', stiffness: 520, damping: 32 };
 const ProductCard = ({ product, onAdd, onRemove, cartQuantity, isOwn = false, isFavorite = false, onToggleFavorite, index = 0 }) => {
   const [imageFailed, setImageFailed] = useState(false);
   const rating = Number(product.seller_rating_count) > 0 ? Number(product.seller_rating).toFixed(1) : null;
-  const sameFloor = product.priority === 'Same Floor';
+  const sameHostel = Boolean(product.sameHostel);
 
   return (
     <motion.article
@@ -36,8 +36,8 @@ const ProductCard = ({ product, onAdd, onRemove, cartQuantity, isOwn = false, is
             </motion.span>
           </motion.button>
         )}
-        <span className={`product-floor ${sameFloor ? 'same' : ''}`}>
-          {sameFloor ? 'Your floor' : `Floor ${product.seller_floor_num || product.seller_floor}`}
+        <span className={`product-floor ${sameHostel ? 'same' : ''}`} title={product.seller_hostel || undefined}>
+          {sameHostel ? 'Your hostel' : (product.seller_hostel || 'Other hostel').replace(/ Hall\b/, '')}
         </span>
       </div>
 
