@@ -14,9 +14,9 @@ router.get('/', auth, async (req, res) => {
   const buyer_floor_id = req.user.floor_id;
   try {
     const [rows] = await db.query(
-      'CALL sp_floor_priority_listings(?)', [buyer_floor_id]
+      'SELECT * FROM sp_floor_priority_listings(?)', [buyer_floor_id]
     );
-    res.json(rows[0]);  // stored procedure returns result in rows[0]
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ message: 'Error fetching listings.', error: err.message });
   }
@@ -181,9 +181,9 @@ router.patch('/:id', auth, async (req, res) => {
        SET mrp                = ?,
            selling_price      = ?,
            quantity_available = COALESCE(?, quantity_available),
-           description        = IF(?, ?, description),
+           description        = CASE WHEN ?::boolean THEN ? ELSE description END,
            room_number        = COALESCE(?, room_number),
-           photo_url          = IF(?, ?, photo_url),
+           photo_url          = CASE WHEN ?::boolean THEN ? ELSE photo_url END,
            listing_status     = ?
        WHERE listing_id = ?`,
       [newMrp, newPrice,

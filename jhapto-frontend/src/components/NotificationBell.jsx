@@ -4,9 +4,10 @@ import { Bell, MessageCircle } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import api from '../utils/api';
 import CountBadge from './CountBadge';
-import { getSocket } from '../utils/socket';
+import { getSocket, REALTIME_ENABLED } from '../utils/socket';
 
-const POLL_MS = 60000;   // fallback only — updates are pushed over Socket.IO
+// With live updates this is just a safety net; without them it's how updates arrive
+const POLL_MS = REALTIME_ENABLED ? 60000 : 15000;
 
 const timeAgo = (date) => {
   const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000);

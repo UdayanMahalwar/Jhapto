@@ -4,58 +4,55 @@ This repository contains the code for the Jhapto Quick Commerce platform, built 
 
 ## What is in this repo
 * **server.js**: the single entry point. Serves the API, live chat (Socket.IO) and the React frontend on one port.
-* **jhapto-database**: SQL scripts for the MySQL schema, triggers, procedures, sample data and migrations.
+* **jhapto-database**: the PostgreSQL schema (`postgres/`) plus the original MySQL scripts it was ported from.
 * **jhapto-backend**: Express API (`app.js`, `routes/`), Socket.IO (`realtime.js`), tests (`tests/`) and admin scripts (`scripts/`).
 * **jhapto-frontend**: React (Vite) frontend.
 
 ## How to run locally
 
-### 1. MySQL (8.x)
+### 1. PostgreSQL
 ```bash
-brew install mysql@8.4 && brew services start mysql@8.4      # macOS
-mysql -u root -e "CREATE USER 'jhapto'@'localhost' IDENTIFIED BY 'jhapto_local';
-                  GRANT ALL ON jhapto.* TO 'jhapto'@'localhost';
-                  GRANT ALL ON jhapto_test.* TO 'jhapto'@'localhost';
-                  SET PERSIST log_bin_trust_function_creators = 1;"
+brew install postgresql@17 && brew services start postgresql@17      # macOS
+psql -d postgres -c "CREATE ROLE jhapto LOGIN PASSWORD 'jhapto_local' CREATEDB;" \
+                 -c "CREATE DATABASE jhapto OWNER jhapto;" \
+                 -c "CREATE DATABASE jhapto_test OWNER jhapto;"
 ```
-The last line lets a non-root user create the project's triggers and functions.
 
 ### 2. App
 ```bash
 npm install
 cp jhapto-backend/.env.example jhapto-backend/.env   # set DB_PASSWORD (jhapto_local above)
-npm run db:setup                                     # creates the jhapto database with sample data
+npm run db:setup                                     # tables, triggers, functions, views + sample data
 npm run dev                                          # http://localhost:3000
 ```
 Seed logins: any student (e.g. `aarav@tiet.ac.in`) / `password123`, admin `admin@jhapto.com` / `admin123`.
 
 `npm run dev` (nodemon, see `nodemon.json`) restarts the server when backend code changes; frontend changes hot-reload in the browser.
-Set `USE_MOCK_DB=true` in `jhapto-backend/.env` to run without MySQL (in-memory data, resets on restart).
+Set `USE_MOCK_DB=true` in `jhapto-backend/.env` to run without a database (in-memory data, resets on restart).
 
-### Production
-```bash
-npm run build && npm start
-```
+## Database
+The live schema is PostgreSQL: [`jhapto-database/postgres/jhapto_postgres.sql`](jhapto-database/postgres/jhapto_postgres.sql)
+(tables, 11 triggers, functions, cursor-based procedures, views and sample data).
+The original MySQL scripts (`jhapto-database/jhapto_database.sql` + migrations v1–v4) are kept for reference; they describe the same design.
+
+## Hosting (Vercel + Neon, free)
+* **Neon** hosts PostgreSQL. Create a project, then run the schema against it:
+  `DATABASE_URL="postgresql://…?sslmode=require" npm run db:setup`
+* **Vercel** serves the built frontend and runs the API as one serverless function (`api/index.js`, config in `vercel.json`).
+  Environment variables: `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV=production`, `UPLOAD_STORAGE=db`, `TRUST_PROXY=1`,
+  `DB_POOL_SIZE=3`, and `VITE_REALTIME=false` (Vercel has no WebSockets, so chat and notifications refresh every few seconds instead of instantly).
+* Images are stored in the database (`UPLOAD_STORAGE=db`) because serverless functions have no persistent disk; uploads are capped at 4 MB.
 
 ## Scripts
 
 | Command | What it does |
 |---|---|
 | `npm run dev` | App on http://localhost:3000 with auto-restart |
-| `npm test` | API + live-chat test suite against a throwaway `jhapto_test` database |
-| `npm run db:setup` | Create the database from `jhapto-database/*.sql` (`-- --reset` drops and rebuilds it) |
+| `npm test` | API + live-chat test suite against a throwaway `jhapto_test` PostgreSQL database |
+| `npm run db:setup` | Set up the database from `jhapto-database/postgres/jhapto_postgres.sql` (`-- --reset` wipes and rebuilds it) |
 | `npm run images:migrate` | Move old base64 images out of the database into `jhapto-backend/uploads/` (dry run; add `-- --apply`) |
 
-## Updating an existing database
-If your database was created with an older version of this repo, apply the migrations you don't have yet, in order:
-```bash
-mysql -u root jhapto < jhapto-database/jhapto_migrations.sql      # only if it predates room numbers / reports
-mysql -u root jhapto < jhapto-database/jhapto_migrations_v2.sql   # seller ratings, notifications
-mysql -u root jhapto < jhapto-database/jhapto_migrations_v3.sql   # categories + catalogue, delivered-only revenue
-npm run images:migrate -- --apply                                  # if listings/reports have base64 images
-```
-
 ## How things work
-* **Images** are uploaded to `POST /api/uploads`, checked by their actual bytes (PNG/JPEG/GIF/WebP, max 5 MB), saved under random names in `jhapto-backend/uploads/` and served from `/uploads/…`. The database stores only the URL.
-* **Live chat**: the chat page joins a Socket.IO room for the order; new messages, order status changes and notification badges are pushed instantly.
-* **Tests** rebuild `jhapto_test` from the real SQL files before each test file, so triggers and procedures are tested too. They refuse to run against a database whose name doesn't end in `_test`.
+* **Images** are uploaded to `POST /api/uploads`, checked by their actual bytes (PNG/JPEG/GIF/WebP, max 4 MB) and saved under random names — on disk locally, in the `upload` table on Vercel — and served from `/uploads/…`.
+* **Live chat**: locally, the chat page joins a Socket.IO room for the order and updates are pushed instantly; on Vercel the same pages poll every few seconds.
+* **Tests** rebuild `jhapto_test` from the real SQL file before each test file, so triggers and procedures are tested too. They refuse to run against a database whose name doesn't end in `_test`.
